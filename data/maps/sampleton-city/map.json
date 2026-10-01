@@ -1,0 +1,39 @@
+{
+  "bounds": [
+    [
+      -0.01,
+      -0.01
+    ],
+    [
+      0.01,
+      0.01
+    ]
+  ],
+  "defaultView": {
+    "center": [
+      0,
+      0
+    ],
+    "zoom": 15
+  },
+  "id": "sampleton-city",
+  "layers": [
+    {
+      "defaultVisible": true,
+      "id": "places",
+      "name": "Places",
+      "types": [
+        "place"
+      ],
+      "zIndex": 0
+    }
+  ],
+  "maxZoom": 20,
+  "minZoom": 12,
+  "name": "Sampleton",
+  "parentEntity": "sampleton",
+  "planeMetersPerUnit": 1,
+  "schemaVersion": 1,
+  "theme": "atlas",
+  "unit": "m"
+}

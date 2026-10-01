@@ -1,0 +1,51 @@
+{
+  "features": [
+    {
+      "geometry": {
+        "coordinates": [
+          0.001,
+          0.0005
+        ],
+        "type": "Point"
+      },
+      "properties": {
+        "icon": "landmark",
+        "id": "sampleton-square",
+        "name": "Sampleton Square",
+        "rank": 1,
+        "status": "canon",
+        "subtype": "landmark",
+        "summary": "A placeholder town square, demonstrating a nested city map (brief §4.4).",
+        "tags": [
+          "sample"
+        ],
+        "type": "place"
+      },
+      "type": "Feature"
+    },
+    {
+      "geometry": {
+        "coordinates": [
+          -0.0015,
+          -0.001
+        ],
+        "type": "Point"
+      },
+      "properties": {
+        "icon": "temple",
+        "id": "sampleton-shrine",
+        "name": "Sampleton Shrine",
+        "rank": 2,
+        "status": "canon",
+        "subtype": "temple",
+        "summary": "A placeholder shrine, a short walk from the square.",
+        "tags": [
+          "sample"
+        ],
+        "type": "place"
+      },
+      "type": "Feature"
+    }
+  ],
+  "type": "FeatureCollection"
+}

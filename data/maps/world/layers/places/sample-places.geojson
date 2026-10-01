@@ -11,6 +11,7 @@
       "properties": {
         "icon": "city",
         "id": "sampleton",
+        "map": "sampleton-city",
         "name": "Sampleton",
         "rank": 1,
         "relations": [
