@@ -1,4 +1,4 @@
-import { useEffect, useRef, type CSSProperties } from 'react';
+import type { CSSProperties } from 'react';
 
 import { formatDate } from '../core/calendar.ts';
 import { Markdown } from '../content/Markdown.tsx';
@@ -9,6 +9,7 @@ import {
 } from '../content/computed.ts';
 import { getEntity } from '../content/entities.ts';
 import { loadMapData, world } from '../map/data.ts';
+import { usePanelDismiss } from './usePanelDismiss.ts';
 
 interface InfoPanelProps {
   entityId: string;
@@ -40,20 +41,8 @@ function EntityLink({ id, onSelectEntity }: { id: string; onSelectEntity: (id: s
 
 /** The click/tap info panel (brief §8) — name, dates, tags, relations (both directions), computed facts, and the full lore body. */
 export function InfoPanel({ entityId, onClose, onSelectEntity, onOpenMap }: InfoPanelProps) {
-  const closeButtonRef = useRef<HTMLButtonElement>(null);
   const entity = getEntity(entityId);
-
-  useEffect(() => {
-    closeButtonRef.current?.focus();
-  }, [entityId]);
-
-  useEffect(() => {
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    };
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
-  }, [onClose]);
+  const closeButtonRef = usePanelDismiss(onClose, entityId);
 
   if (!entity) {
     return (
@@ -218,6 +207,10 @@ const panelStyle: CSSProperties = {
   position: 'absolute',
   top: 0,
   right: 0,
+  // Above the toolbar/breadcrumbs (zIndex 1, App.tsx) -- on a narrow
+  // viewport the toolbar wraps tall enough to otherwise sit on top of
+  // this panel's own close button and heading.
+  zIndex: 2,
   bottom: 0,
   width: 'min(360px, 100%)',
   overflowY: 'auto',

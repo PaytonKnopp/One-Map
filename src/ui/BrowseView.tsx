@@ -1,6 +1,7 @@
 import { useMemo, useState, type CSSProperties } from 'react';
 
 import { listEntities, type Entity } from '../content/entities.ts';
+import { usePanelDismiss } from './usePanelDismiss.ts';
 
 interface BrowseViewProps {
   onSelectEntity: (id: string) => void;
@@ -12,6 +13,7 @@ const SHOW_DRAFT_DEFAULT = true; // dev-visible; a production build / toggle hid
 
 /** The Browse/Index view (brief §8): every entity, filterable by type/tag/status. */
 export function BrowseView({ onSelectEntity, onClose }: BrowseViewProps) {
+  const closeButtonRef = usePanelDismiss(onClose);
   const [typeFilter, setTypeFilter] = useState('');
   const [tagFilter, setTagFilter] = useState('');
   const [showRetired, setShowRetired] = useState(SHOW_RETIRED_DEFAULT);
@@ -31,7 +33,13 @@ export function BrowseView({ onSelectEntity, onClose }: BrowseViewProps) {
 
   return (
     <aside style={panelStyle} aria-label="Browse all entities">
-      <button type="button" onClick={onClose} style={closeButtonStyle} aria-label="Close">
+      <button
+        type="button"
+        ref={closeButtonRef}
+        onClick={onClose}
+        style={closeButtonStyle}
+        aria-label="Close"
+      >
         ×
       </button>
       <h2 style={{ marginTop: 0 }}>Browse</h2>
@@ -117,6 +125,10 @@ const panelStyle: CSSProperties = {
   position: 'absolute',
   top: 0,
   right: 0,
+  // Above the toolbar/breadcrumbs (zIndex 1, App.tsx) -- on a narrow
+  // viewport the toolbar wraps tall enough to otherwise sit on top of
+  // this panel's own close button and heading.
+  zIndex: 2,
   bottom: 0,
   width: 'min(380px, 100%)',
   overflowY: 'auto',

@@ -1,12 +1,15 @@
 import type { CSSProperties } from 'react';
 import commits from 'virtual:chronicle';
 
+import { usePanelDismiss } from './usePanelDismiss.ts';
+
 interface ChroniclePageProps {
   onClose: () => void;
 }
 
 /** "World chronicle" (brief §8): recent git history, grouped by date — generated at build time (vite.config.ts's chroniclePlugin), not hand-maintained. */
 export function ChroniclePage({ onClose }: ChroniclePageProps) {
+  const closeButtonRef = usePanelDismiss(onClose);
   const byDate = new Map<string, typeof commits>();
   for (const commit of commits) {
     const existing = byDate.get(commit.date) ?? [];
@@ -16,7 +19,13 @@ export function ChroniclePage({ onClose }: ChroniclePageProps) {
 
   return (
     <aside style={panelStyle} aria-label="World chronicle">
-      <button type="button" onClick={onClose} style={closeButtonStyle} aria-label="Close">
+      <button
+        type="button"
+        ref={closeButtonRef}
+        onClick={onClose}
+        style={closeButtonStyle}
+        aria-label="Close"
+      >
         ×
       </button>
       <h2 style={{ marginTop: 0 }}>Chronicle</h2>
@@ -45,6 +54,10 @@ const panelStyle: CSSProperties = {
   position: 'absolute',
   top: 0,
   right: 0,
+  // Above the toolbar/breadcrumbs (zIndex 1, App.tsx) -- on a narrow
+  // viewport the toolbar wraps tall enough to otherwise sit on top of
+  // this panel's own close button and heading.
+  zIndex: 2,
   bottom: 0,
   width: 'min(380px, 100%)',
   overflowY: 'auto',

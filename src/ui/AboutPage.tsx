@@ -4,6 +4,7 @@ import commits from 'virtual:chronicle';
 import { regionAreaInWorldUnits } from '../content/computed.ts';
 import { listEntities } from '../content/entities.ts';
 import { listMapIds, world } from '../map/data.ts';
+import { usePanelDismiss } from './usePanelDismiss.ts';
 
 interface AboutPageProps {
   onClose: () => void;
@@ -11,6 +12,7 @@ interface AboutPageProps {
 
 /** About/Stats page (brief §8): world name, entity counts, map count, total mapped area, last updated, attributions. */
 export function AboutPage({ onClose }: AboutPageProps) {
+  const closeButtonRef = usePanelDismiss(onClose);
   const entities = listEntities();
   const countsByType = new Map<string, number>();
   for (const entity of entities) {
@@ -23,7 +25,13 @@ export function AboutPage({ onClose }: AboutPageProps) {
 
   return (
     <aside style={panelStyle} aria-label="About and statistics">
-      <button type="button" onClick={onClose} style={closeButtonStyle} aria-label="Close">
+      <button
+        type="button"
+        ref={closeButtonRef}
+        onClick={onClose}
+        style={closeButtonStyle}
+        aria-label="Close"
+      >
         ×
       </button>
       <h2 style={{ marginTop: 0 }}>{world.name}</h2>
@@ -68,6 +76,10 @@ const panelStyle: CSSProperties = {
   position: 'absolute',
   top: 0,
   right: 0,
+  // Above the toolbar/breadcrumbs (zIndex 1, App.tsx) -- on a narrow
+  // viewport the toolbar wraps tall enough to otherwise sit on top of
+  // this panel's own close button and heading.
+  zIndex: 2,
   bottom: 0,
   width: 'min(380px, 100%)',
   overflowY: 'auto',

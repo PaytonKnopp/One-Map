@@ -18,6 +18,12 @@ export function SearchBox({ onSelectEntity }: SearchBoxProps) {
         type="search"
         value={query}
         onChange={(e) => setQuery(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Escape' && query) {
+            e.stopPropagation();
+            setQuery('');
+          }
+        }}
         placeholder="Search the world…"
         aria-label="Search"
         aria-controls={listId}
