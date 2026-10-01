@@ -72,3 +72,29 @@ export function loadMapData(mapId: string): LoadedMapData {
 
   return { map, theme, featuresByLayer };
 }
+
+/** Every map id with a map.json, derived from what's actually on disk. */
+export function listMapIds(): string[] {
+  return Object.keys(rawMapConfigs)
+    .map((path) => path.split('/')[3])
+    .filter((id): id is string => id !== undefined)
+    .sort();
+}
+
+/** Every spatial feature across every map — the whole world, not just one map's layers. Used to build the unified entity index (src/content/entities.ts), which spans the full repo, not one map. */
+export function loadAllSpatialFeatures(): {
+  mapId: string;
+  layerId: string;
+  feature: SpatialFeature;
+}[] {
+  const result: { mapId: string; layerId: string; feature: SpatialFeature }[] = [];
+  for (const mapId of listMapIds()) {
+    const { map, featuresByLayer } = loadMapData(mapId);
+    for (const layer of map.layers) {
+      for (const feature of featuresByLayer.get(layer.id) ?? []) {
+        result.push({ mapId, layerId: layer.id, feature });
+      }
+    }
+  }
+  return result;
+}
