@@ -20,6 +20,7 @@ import { compareDates, isValidDate } from '../src/core/calendar.ts';
 import {
   EntityTypesRegistrySchema,
   LabelFeatureSchema,
+  LoreFrontmatterSchema,
   MapConfigSchema,
   PlaceFeatureSchema,
   RegionFeatureSchema,
@@ -29,6 +30,7 @@ import {
   WorldSchema,
   type CalendarConfig,
   type SpatialFeature,
+  type SpatialProperties,
 } from '../src/core/schema/index.ts';
 import { formatJson } from './lib/canonical-json.ts';
 import { listDataJsonFiles } from './lib/data-files.ts';
@@ -39,6 +41,7 @@ import {
   listThemeIds,
   loadLayerFiles,
 } from './lib/load-data.ts';
+import { loadLoreFiles, wikiLinkTargets } from './lib/load-lore.ts';
 
 const { values } = parseArgs({
   options: {
@@ -49,9 +52,11 @@ const { values } = parseArgs({
 if (values.help) {
   console.log(`Usage: npm run validate
 
-Validates data/world.json and data/registry/*.json against their schemas,
-checks cross-reference consistency, and checks canonical formatting.
-Exits 1 if anything fails.
+Validates world.json, the registries, every theme/map/layer, and every
+lore file against their schemas; checks cross-reference consistency
+(relations, icons, theme/map references, field ownership, wiki links);
+and checks canonical formatting. Prints warnings (e.g. a spatial entity
+with no lore file) without failing. Exits 1 if anything else fails.
 `);
   process.exit(0);
 }
@@ -62,9 +67,14 @@ interface Problem {
 }
 
 const problems: Problem[] = [];
+const warnings: Problem[] = [];
 
 function fail(file: string, message: string): void {
   problems.push({ file, message });
+}
+
+function warn(file: string, message: string): void {
+  warnings.push({ file, message });
 }
 
 function loadJson(file: string): unknown {
@@ -108,6 +118,7 @@ if (worldJson !== undefined) {
 const entityTypesPath = 'data/registry/entity-types.json';
 const entityTypesJson = loadJson(entityTypesPath);
 let spatialSubtypesByType: Record<string, string[]> | undefined;
+let nonSpatialTypeKeys: Set<string> | undefined;
 if (entityTypesJson !== undefined) {
   const result = EntityTypesRegistrySchema.safeParse(entityTypesJson);
   if (!result.success) {
@@ -118,6 +129,7 @@ if (entityTypesJson !== undefined) {
     spatialSubtypesByType = Object.fromEntries(
       Object.entries(result.data.spatial).map(([type, def]) => [type, def.subtypes]),
     );
+    nonSpatialTypeKeys = new Set(Object.keys(result.data.nonSpatial));
     const spatialKeys = Object.keys(result.data.spatial);
     const nonSpatialKeys = Object.keys(result.data.nonSpatial);
     const collisions = spatialKeys.filter((key) => nonSpatialKeys.includes(key));
@@ -390,16 +402,126 @@ for (const mapId of mapIds) {
   }
 }
 
-// Relation targets, checked after every map's features are collected so
-// forward references (an earlier-loaded file pointing at a later one) work.
+// --- lore/<type>/<id>.md ----------------------------------------------
+
+const SPATIAL_TYPES = new Set(['place', 'region', 'route', 'label']);
+const FEATURE_OWNED_FIELDS = [
+  'name',
+  'aliases',
+  'summary',
+  'tags',
+  'from',
+  'to',
+  'relations',
+  'images',
+] as const;
+
+/** id -> { relations, path } for every entity, spatial or lore-only — the universe `relations[].target` and wiki links are checked against. */
+const allEntitiesById = new Map<
+  string,
+  { relations: { type: string; target: string }[]; path: string }
+>();
 for (const [id, feature] of allFeaturesById) {
-  for (const relation of feature.properties.relations ?? []) {
-    if (!allFeaturesById.has(relation.target)) {
+  allEntitiesById.set(id, {
+    relations: feature.properties.relations ?? [],
+    path: seenEntityIds.get(id) ?? id,
+  });
+}
+
+const loreFilesByEntityId = new Map<string, string>(); // for the "missing lore file" warning below
+const loreBodiesForWikiCheck: { id: string; path: string; body: string }[] = [];
+
+for (const { path, data, body } of loadLoreFiles()) {
+  const result = LoreFrontmatterSchema.safeParse(data);
+  if (!result.success) {
+    for (const issue of result.error.issues) {
+      fail(path, `${issue.path.join('.') || '(root)'}: ${issue.message}`);
+    }
+    continue;
+  }
+  const fm = result.data;
+  loreFilesByEntityId.set(fm.id, path);
+
+  if (SPATIAL_TYPES.has(fm.type)) {
+    const feature = allFeaturesById.get(fm.id);
+    if (!feature) {
+      fail(path, `lore file for "${fm.id}" (type "${fm.type}") has no matching spatial entity`);
+      continue;
+    }
+    for (const field of FEATURE_OWNED_FIELDS) {
+      const loreValue = fm[field as keyof typeof fm];
+      const featureValue = feature.properties[field as keyof SpatialProperties];
+      if (loreValue !== undefined && featureValue !== undefined) {
+        fail(
+          path,
+          `"${field}" is defined on both the feature and this lore frontmatter — pick one (brief §6 field ownership)`,
+        );
+      }
+    }
+  } else {
+    if (allFeaturesById.has(fm.id)) {
       fail(
-        seenEntityIds.get(id) ?? id,
+        path,
+        `lore id "${fm.id}" collides with a spatial entity but frontmatter type "${fm.type}" isn't spatial`,
+      );
+    } else if (allEntitiesById.has(fm.id)) {
+      fail(path, `duplicate entity id "${fm.id}" (also at ${allEntitiesById.get(fm.id)!.path})`);
+    }
+    if (nonSpatialTypeKeys && !nonSpatialTypeKeys.has(fm.type)) {
+      fail(path, `type "${fm.type}" isn't registered as non-spatial in entity-types.json`);
+    }
+    allEntitiesById.set(fm.id, { relations: fm.relations ?? [], path });
+  }
+
+  for (const relation of fm.relations ?? []) {
+    if (relationTypeKeys && !relationTypeKeys.has(relation.type)) {
+      fail(
+        path,
+        `"${fm.id}": relation type "${relation.type}" isn't registered in relation-types.json`,
+      );
+    }
+  }
+  if (fm.location) {
+    for (const locationId of Array.isArray(fm.location) ? fm.location : [fm.location]) {
+      if (!allFeaturesById.has(locationId)) {
+        fail(path, `"${fm.id}": location "${locationId}" isn't a spatial entity`);
+      }
+    }
+  }
+
+  loreBodiesForWikiCheck.push({ id: fm.id, path, body });
+}
+
+// Wiki links, checked in their own pass against the complete entity set so
+// forward references between lore files (loaded in directory order, not
+// dependency order) don't produce false "doesn't resolve" warnings.
+for (const { id, path, body } of loreBodiesForWikiCheck) {
+  for (const targetId of wikiLinkTargets(body)) {
+    if (targetId !== id && !allFeaturesById.has(targetId) && !loreFilesByEntityId.has(targetId)) {
+      warn(path, `"${id}": wiki link to "${targetId}" doesn't resolve to any entity`);
+    }
+  }
+}
+
+// Relation targets, checked after every map AND every lore file are loaded
+// so forward references (an earlier file pointing at a later one) work.
+for (const [id, entity] of allEntitiesById) {
+  for (const relation of entity.relations) {
+    if (!allEntitiesById.has(relation.target)) {
+      fail(
+        entity.path,
         `"${id}" has a "${relation.type}" relation targeting unknown entity "${relation.target}"`,
       );
     }
+  }
+}
+
+for (const feature of allFeaturesById.values()) {
+  if (!loreFilesByEntityId.has(feature.properties.id)) {
+    warn(
+      seenEntityIds.get(feature.properties.id) ?? feature.properties.id,
+      `"${feature.properties.id}" has no lore file (optional)`,
+    );
   }
 }
 
@@ -423,20 +545,30 @@ for (const file of listDataJsonFiles()) {
 
 // --- report ---------------------------------------------------------------
 
-if (problems.length > 0) {
+function printGrouped(items: Problem[]): void {
   const byFile = new Map<string, string[]>();
-  for (const { file, message } of problems) {
+  for (const { file, message } of items) {
     const existing = byFile.get(file) ?? [];
     existing.push(message);
     byFile.set(file, existing);
   }
-  console.error(`✗ ${problems.length} problem(s) found:\n`);
   for (const [file, messages] of byFile) {
     console.error(file);
     for (const message of messages) {
       console.error(`  - ${message}`);
     }
   }
+}
+
+if (warnings.length > 0) {
+  console.error(`⚠ ${warnings.length} warning(s):\n`);
+  printGrouped(warnings);
+  console.error('');
+}
+
+if (problems.length > 0) {
+  console.error(`✗ ${problems.length} problem(s) found:\n`);
+  printGrouped(problems);
   process.exitCode = 1;
 } else {
   console.log('✓ validation passed');
