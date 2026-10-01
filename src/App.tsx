@@ -24,7 +24,12 @@ export function App() {
 
   // Timeline/measure state isn't deep-linked (brief doesn't ask for it, and
   // it would make every slider tick a history entry) — local state instead.
-  const [viewedYear, setViewedYear] = useState(world.calendar.currentYear);
+  // The initial year CAN be seeded from the URL once, at mount, purely so
+  // scripts/snapshot.ts can request a specific year without needing a full
+  // round-trip route param; it doesn't keep syncing after that.
+  const [viewedYear, setViewedYear] = useState(
+    () => Number(route.params.get('year')) || world.calendar.currentYear,
+  );
   const [ghost, setGhost] = useState(false);
   const [measureActive, setMeasureActive] = useState(false);
 

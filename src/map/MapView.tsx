@@ -285,6 +285,10 @@ export function MapView({
 
     mapRef.current = map;
     map.addControl(new NavigationControl({ showCompass: false }), 'top-right');
+    // Automation hook for scripts/snapshot.ts (brief §10) — lets it drive
+    // the camera to an exact bbox/center+zoom that the hash route itself
+    // doesn't model. Not used by anything in the app's own UI.
+    (window as unknown as { __oneWorldMap?: MapLibreGLMap }).__oneWorldMap = map;
 
     let cancelled = false;
 
@@ -371,6 +375,7 @@ export function MapView({
       map.remove();
       mapRef.current = null;
       setMapInstance(null);
+      delete (window as unknown as { __oneWorldMap?: MapLibreGLMap }).__oneWorldMap;
     };
     // Rebuilt from scratch on theme/map/data identity changes — M2 has no
     // live-editing path yet, so this trades incremental updates for simplicity.
