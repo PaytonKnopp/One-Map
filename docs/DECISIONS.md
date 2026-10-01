@@ -59,11 +59,15 @@ unmodified in both environments.
 ## 2026-10-01 — Markdown pipeline
 
 `react-markdown` + `remark-gfm` for GitHub-flavored Markdown, a small
-custom remark plugin for `[[id]]` / `[[id|text]]` wiki links, and
-`rehype-sanitize` so lore bodies (plain text, publicly editable over a
-world's lifetime) can never inject arbitrary HTML/scripts into the viewer.
-Frontmatter parsed with `gray-matter`. (Not yet installed — lands in M3
-when lore rendering is built.)
+custom remark plugin (`src/content/wikiLinks.ts`) for `[[id]]` /
+`[[id|text]]` wiki links, and `rehype-sanitize` so lore bodies (plain
+text, publicly editable over a world's lifetime) can never inject
+arbitrary HTML/scripts into the viewer. A wiki link encodes its target
+id in the link's own `#/?e=<id>` URL rather than a custom HTML
+attribute — simpler, and sidesteps needing to teach rehype-sanitize's
+schema about a custom `data-*` attribute. Frontmatter parsing:
+hand-rolled split + `js-yaml`, not `gray-matter` — see that entry
+below, added once lore rendering actually landed (M3).
 
 ## 2026-10-01 — CLI argument parsing: `node:util parseArgs`
 
@@ -103,16 +107,17 @@ public) to install a C++ toolchain and `cmake` just to regenerate label
 fonts fails the "must work on Windows/macOS/Linux with Node-based
 scripts only" requirement outright.
 
-**Decision: text labels are rendered as a DOM/SVG overlay**, a React
-component kept in sync with the map's camera via `map.on('move')` +
-`map.project()`, using ordinary self-hosted `.woff2` fonts and CSS
-`@font-face` (`npm run fonts` just copies/subsets font files — no PBF
-generation, no native deps). Region-name curving uses SVG `<textPath>`
-along the region's actual boundary-derived baseline, which is arguably
-more direct than MapLibre's `symbol-placement: line`. Label
-collision/zoom-rank visibility is implemented in `src/map/labels/` (see
-that module) rather than relying on MapLibre's built-in symbol
-collision index.
+**Decision: text labels are rendered as a DOM/SVG overlay**
+(`src/map/LabelOverlay.tsx`), a React component kept in sync with the
+map's camera via `map.on('move')` + `map.project()`, using ordinary
+self-hosted webfonts (`@fontsource/*` — no PBF generation, no native
+deps; see the "Fonts self-hosted" entry below). Region-name curving
+uses SVG `<textPath>` along the region's actual boundary-derived
+baseline, which is arguably more direct than MapLibre's
+`symbol-placement: line`. Label collision/zoom-rank visibility is
+implemented in that same component (greedy rank-priority box overlap
+check) rather than relying on MapLibre's built-in symbol collision
+index.
 
 **Icons remain MapLibre symbol layers** (icon-image only, no text) —
 icons need no glyphs at all, only a sprite image, so MapLibre's own
@@ -244,3 +249,88 @@ clear of whatever triggers the crash, confirmed stable in testing. If a
 future `maplibre-gl` upgrade fixes the underlying bug, this inset can be
 tightened back toward the true extent — it's not load-bearing for
 anything in the data model.
+
+## 2026-10-01 — Frontmatter parsing: hand-rolled split + `js-yaml`, not `gray-matter`
+
+`gray-matter` is the ecosystem-standard frontmatter parser, so it was
+the first choice for lore files (brief §3). It doesn't work in the
+browser, though: confirmed via a real runtime error (`ReferenceError:
+Buffer is not defined`) when the viewer loaded lore content —
+`gray-matter`'s `to-file.js` unconditionally calls Node's `Buffer` on
+every parse, with no option to avoid it. Lore parsing has to run in
+both the browser (the viewer, `src/content/lore.ts`) and Node
+(`scripts/validate.ts`), so a Node-only library doesn't fit.
+
+Replaced with `src/core/frontmatter.ts`: a small regex split of the
+`---\n...\n---\n` block from the body, then `js-yaml` (pure JS, no
+Node builtins) to parse the YAML itself — js-yaml does the actual hard
+part (full YAML spec support), so this isn't a hand-rolled YAML parser,
+just a hand-rolled _delimiter_ split, which is a one-line regex. Shared
+by both the viewer and `scripts/lib/load-lore.ts`, so lore parsing
+can't drift between them — same pattern as `src/core/geometry.ts`/
+`calendar.ts`.
+
+**Lesson for later additions**: any dependency meant to run in the
+viewer needs checking for Node-only assumptions (`Buffer`, `fs`,
+`process`) before adopting it, not just "does it have the API I need" —
+`gray-matter`'s README gives no indication it's Node-only.
+
+## 2026-10-01 — Routing: a ~40-line custom hash router, not react-router
+
+Brief §3 only asks for hash-based routing so deep links survive on
+GitHub Pages with no server rewrites. The app has two "pages" (the map,
+optionally with an info panel open; the browse index) and one query
+param that matters (`e`, the selected entity). `src/routing/
+useHashRoute.ts` is a small hook: parse `location.hash` into
+`{path, params}`, a `navigate()` that sets `location.hash`, and a
+`hashchange` listener. Back/forward history comes free — setting
+`location.hash` already pushes a browser history entry, confirmed
+working via a real back-button test. Pulling in react-router for this
+would be the opposite of "boring tech, few dependencies" — it solves
+problems (nested route trees, data loaders, server rendering) this app
+doesn't have.
+
+## 2026-10-01 — Entity id resolves via `href`, not a custom HTML attribute
+
+A wiki link needs the viewer to know, at render time, whether its
+target entity actually exists (to style a dangling link differently).
+The natural-looking approach — stash the target id in a custom
+`data-wiki-link` attribute via the remark plugin's `hProperties`, read
+it back in a custom `<a>` component — depends on that attribute
+surviving `rehype-sanitize`'s schema (which strips unrecognized
+attributes by default) and on hast's data-attribute casing convention,
+neither of which was worth the risk to get exactly right without a
+live browser to check against. Simpler and more robust: the link's
+`href` is already `#/?e=<id>` (that's the real navigation target
+anyway), so the renderer just parses the id back out of `href` with
+`URLSearchParams`. No custom attribute, no sanitize-schema change
+needed — the default (conservative) schema is used as-is.
+
+## 2026-10-01 — Backlinks and computed spatial facts: plain functions over the loaded entity graph
+
+Brief §6 says containment, nearest-neighbor, route length/region area,
+and relation backlinks must be _computed_, never hand-maintained. Since
+the whole world's data is already loaded into memory for the viewer
+(it's a static site — there's no server to precompute on), "computed
+at build" and "computed on access from the in-memory graph" come out
+the same for the user: `src/content/entities.ts` builds the backlink
+index once (iterate every entity's `relations[]`, look up the
+registered reciprocal, push onto the target's `backlinks[]`) when the
+module first loads; `src/content/computed.ts` has plain functions
+(`containingRegions`, `routeLengthInWorldUnits`,
+`regionAreaInWorldUnits`) called on demand by the info panel, reusing
+`src/core/geometry.ts`'s existing planar math (a new `pointInRing`/
+`pointInPolygonRings` pair, even-odd ray casting — topological, so it
+works directly on [lng, lat] with no mercator projection needed).
+Nothing is persisted or cached beyond the entity graph itself; a future
+session adding/editing entities never has to touch a derived-data file.
+
+## 2026-10-01 — Search: MiniSearch over name/aliases/tags/summary/lore text
+
+One index built once at module load (`src/content/search.ts`) from
+every entity's denormalized text fields, boosted name > aliases/tags >
+summary > lore body, with `prefix: true` and light `fuzzy: 0.2` so
+partial/slightly-misspelled queries still find things. Confirmed
+working end-to-end in a real browser: searching "Aldric" found both
+"Aldric Sample" (name match) and, via fuzzy matching, surfaced
+"Sampleton" through its lore body mentioning him.

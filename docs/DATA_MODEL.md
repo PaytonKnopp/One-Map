@@ -227,14 +227,73 @@ under it is served verbatim at the site root, fetchable at runtime
 the JS. `assets/icons/*.svg` are the icon source files (one per id,
 referenced from `properties.icon`); `assets/icons/sprite.svg` is a
 generated `<symbol>`-sprite build artifact (`npm run icons`) for future
-DOM UI use (M3+) — map markers themselves rasterize the individual
+DOM UI use (not yet consumed) — map markers themselves rasterize the individual
 source SVGs directly (`src/map/icons.ts`), not the sprite. Fonts are
 _not_ placed here — see `docs/DECISIONS.md`, they're self-hosted via
 `@fontsource/*` npm packages instead. Full licensing/attribution log:
 `docs/ASSETS.md`.
 
+## `lore/<type>/<id>.md`
+
+A non-spatial entity (`person`, `faction`, `event`, …), or a spatial
+entity's long-form text — see "Field ownership" above for which. YAML
+frontmatter + a Markdown body. Schema: `src/core/schema/lore.ts`
+(`LoreFrontmatterSchema`). Parsed with `src/core/frontmatter.ts` (a
+hand-rolled `---` split + `js-yaml`), not `gray-matter` — see
+`docs/DECISIONS.md` for why.
+
+| Field                                                             | Type                                                  | Notes                                                                                                                                                                                                             |
+| ----------------------------------------------------------------- | ----------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `id`                                                              | kebab-case string                                     | For a spatial entity's lore file, must match an existing feature id. For a non-spatial entity, this is where its id is assigned.                                                                                  |
+| `type`                                                            | registered type id                                    | A spatial type (`place`/`region`/`route`/`label`) means this file is that feature's lore body; any other registered type (`data/registry/entity-types.json` → `nonSpatial`) means this file _is_ the entity.      |
+| `name`                                                            | string (optional)                                     | Non-spatial entities only in practice — a spatial entity's `name` already lives on its feature, and defining it here too is a field-ownership violation.                                                          |
+| `aliases`, `summary`, `tags`, `from`, `to`, `relations`, `images` | —                                                     | Same shape and meaning as the matching fields on a spatial feature (`docs/DATA_MODEL.md`'s layer-file section) — these are the fields `npm run validate` checks aren't _also_ set on a matching feature.          |
+| `date`                                                            | `DateKey` (optional)                                  | A single point in time, for `event`-type entities that happen rather than span — distinct from `from`/`to`.                                                                                                       |
+| `status`                                                          | `"canon" \| "draft" \| "retired"` (default `"canon"`) |                                                                                                                                                                                                                   |
+| `location`                                                        | id or id[] (optional)                                 | Spatial entity id(s) this non-spatial entity should be shown at on the map. Not yet rendered as extra map markers (noted in `docs/PROGRESS.md`) — currently only used for schema completeness and future tooling. |
+
+The Markdown body supports GitHub-flavored Markdown (tables, strikethrough,
+task lists, …) plus `[[entity-id]]` / `[[entity-id|display text]]` wiki
+links, sanitized before rendering (`src/content/Markdown.tsx`) so a lore
+edit can never inject HTML/scripts into the viewer.
+
+## The unified entity graph (`src/content/entities.ts`)
+
+Every spatial feature (across every map) and every lore file are merged
+into one `Entity` per id at load time — the shape every UI component
+(`InfoPanel`, `BrowseView`, `SearchBox`) reads, so nothing needs to know
+whether a given field came from a GeoJSON feature or a lore file's
+frontmatter. Built once per page load; nothing is cached to disk or
+precomputed by a build script, since the whole world's data is already
+in memory for a static site either way (brief §6's "computed, never
+hand-maintained" is satisfied by _when_ it's computed, not by a
+separate build artifact — see `docs/DECISIONS.md`).
+
+- **Backlinks**: the reverse of every `relations[]` entry, labeled with
+  the registered reciprocal type, attached to the _target_ entity —
+  never hand-written on both ends.
+- **Computed spatial facts** (`src/content/computed.ts`): which
+  region(s) a point-geometry entity falls inside (even-odd ray casting,
+  `src/core/geometry.ts`'s `pointInRing`/`pointInPolygonRings`), a
+  route's length, a region's area — all in the owning map's own world
+  units.
+
+## Routing and deep links
+
+Hash-based (brief §3): `#/?e=<id>` opens that entity's info panel over
+the map (brief's "a deep link for every entity"); `#/browse?...` opens
+the Browse view. `src/routing/useHashRoute.ts` is the whole router — no
+routing library; see `docs/DECISIONS.md`. Back/forward works via the
+browser's native history, since setting `location.hash` already pushes
+an entry.
+
+## Search (`src/content/search.ts`)
+
+A MiniSearch index over every entity's `name`/`aliases`/`tags`/
+`summary`/lore body, built once at load. Not persisted; rebuilt fresh
+on every page load from the same in-memory entity graph.
+
 ## What doesn't exist yet
 
-`lore/<type>/*.md` (beyond the placeholder `lore/_world-bible.md`) and
-nested maps are not created until later milestones reference them — see
-`docs/PROGRESS.md`.
+Nested maps aren't created until a later milestone references them
+(M4) — see `docs/PROGRESS.md`.

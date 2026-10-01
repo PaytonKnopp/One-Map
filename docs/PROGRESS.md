@@ -75,9 +75,59 @@ headless-GPU driver warnings.
 
 ## M3 — Info layer
 
-- [ ] Info panel, lore rendering (`react-markdown` + wiki links), sanitized
-- [ ] Relations + computed backlinks
-- [ ] MiniSearch-powered search; Browse/Index view; filters; deep links
+- [x] Info panel (`src/ui/InfoPanel.tsx`) on click/tap: name, type/
+      subtype, summary, dates (in-world calendar formatting), tags,
+      computed containing region(s), relations both directions
+      (outgoing + computed backlinks, clickable), images, full lore;
+      Escape-to-close, focus management
+- [x] Lore rendering (`src/content/Markdown.tsx`): `react-markdown` +
+      `remark-gfm` + `rehype-sanitize`, `[[wiki links]]` via a custom
+      remark plugin (`src/content/wikiLinks.ts`)
+- [x] Relations + computed backlinks (`src/content/entities.ts`); computed
+      spatial facts — containing region(s), route length, region area
+      (`src/content/computed.ts`, new `pointInRing`/`pointInPolygonRings`
+      in `src/core/geometry.ts`)
+- [x] MiniSearch-powered search (`src/content/search.ts` +
+      `src/ui/SearchBox.tsx`); Browse/Index view with type/tag/status
+      filters (`src/ui/BrowseView.tsx`); deep links + back/forward via a
+      small custom hash router (`src/routing/useHashRoute.ts`) —
+      no routing library, see `docs/DECISIONS.md`
+- [x] Non-spatial entities: `lore/<type>/<id>.md` with full frontmatter;
+      merged into the same entity graph as spatial features
+- [x] `scripts/validate.ts` extended: lore frontmatter schema, field-
+      ownership conflicts (a field set on both a feature and its lore
+      file), lore-file-without-matching-feature, relation targets across
+      the whole entity graph (not just spatial), wiki-link dangling
+      checks (warning), spatial-entity-with-no-lore-file (warning)
+
+**One real bug found and fixed** (documented in `docs/DECISIONS.md`):
+`gray-matter` (the originally-planned frontmatter parser) throws
+`ReferenceError: Buffer is not defined` in the browser — it
+unconditionally calls Node's `Buffer`. Replaced with a ~15-line hand-
+rolled `---` delimiter split + `js-yaml` (pure JS) in the new
+`src/core/frontmatter.ts`, shared by the viewer and `scripts/validate.ts`.
+
+**Sample content added**: two lore files (`lore/place/sampleton.md`,
+`lore/person/aldric-sample.md`) exercising a spatial entity's lore body,
+a non-spatial entity, a relation (`ruler-of`) and its computed
+reciprocal backlink (`ruled-by`), and wiki links both to a spatial and
+a non-spatial entity — tagged `sample`, extending (not replacing) the
+M2 seed world.
+
+**Not built**: non-spatial entities with a `location` field aren't
+rendered as extra map markers yet (schema support exists; noted as an
+open question below) — not required by brief §8's M3 feature list, and
+genuinely deferrable until real content needs it.
+
+**Verification:** `npm run validate`/`test`/`build` all pass, plus a
+one-off Playwright check (not committed) confirming, in a real browser:
+searching "Aldric" finds both the person and (via lore-text fuzzy
+match) Sampleton; selecting a result opens the info panel and flies the
+map to it; the wiki link in Aldric's lore navigates to Sampleton;
+Sampleton's panel shows the computed "In: Sample Country" and both the
+direct `capital-of` relation and the computed `ruled-by` backlink; the
+browser Back button correctly returns to Aldric's panel; Browse lists
+all 9 entities (8 spatial + 1 non-spatial) with working filters.
 
 ## M4 — Depth
 
@@ -128,3 +178,14 @@ headless-GPU driver warnings.
   `byType`/`bySubtype` resolution covers every subtype so far; wiring in
   the per-entity override is a small follow-up once something actually
   needs it.
+- Non-spatial entities with a `location` field (brief §4.4/§6 — e.g. a
+  person shown on the map at the place they rule) aren't rendered as
+  map markers yet — only genuine spatial features (with their own
+  geometry) show on the map today. Worth building once real content
+  wants it; not a blocker for anything else.
+- The production/draft visibility split (brief §6: `draft` hidden from
+  the production build by default, visible in dev / via a toggle) isn't
+  wired up yet — `BrowseView` currently defaults `draft` to visible
+  unconditionally. A real show/hide toggle (and a build-time env check)
+  is a small follow-up, probably natural to bundle with the M4
+  `parchment` theme switcher UI work.
