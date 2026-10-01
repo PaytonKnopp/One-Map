@@ -56,3 +56,8 @@ export function loadLayerFiles(mapId: string, layerId: string): LoadedLayerFile[
 export function iconExists(iconId: string): boolean {
   return existsSync(`assets/icons/${iconId}.svg`);
 }
+
+/** Whether a path under assets/ (e.g. an art layer's `src`) actually exists. */
+export function assetExists(assetPath: string): boolean {
+  return existsSync(`assets/${assetPath}`);
+}

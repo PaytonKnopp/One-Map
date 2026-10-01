@@ -35,6 +35,7 @@ import {
 import { formatJson } from './lib/canonical-json.ts';
 import { listDataJsonFiles } from './lib/data-files.ts';
 import {
+  assetExists,
   iconExists,
   listLayerFoldersOnDisk,
   listMapIds,
@@ -215,6 +216,7 @@ if (defaultMap !== undefined && !mapIds.includes(defaultMap)) {
 // collected across every map, not reset per map.
 const seenEntityIds = new Map<string, string>(); // id -> file it was first seen in
 const allFeaturesById = new Map<string, SpatialFeature>();
+const mapConfigsById = new Map<string, { parentEntity: string | undefined; path: string }>();
 
 for (const mapId of mapIds) {
   const mapPath = `data/maps/${mapId}/map.json`;
@@ -235,6 +237,13 @@ for (const mapId of mapIds) {
   }
   if (mapConfig.theme !== undefined && !themeIds.includes(mapConfig.theme)) {
     fail(mapPath, `theme "${mapConfig.theme}" has no data/themes/${mapConfig.theme}.json`);
+  }
+  mapConfigsById.set(mapConfig.id, { parentEntity: mapConfig.parentEntity, path: mapPath });
+
+  for (const artLayer of mapConfig.artLayers ?? []) {
+    if (!assetExists(artLayer.src)) {
+      fail(mapPath, `art layer "${artLayer.id}": "${artLayer.src}" has no file under assets/`);
+    }
   }
 
   const zIndexSeen = new Map<number, string>();
@@ -513,6 +522,23 @@ for (const [id, entity] of allEntitiesById) {
         `"${id}" has a "${relation.type}" relation targeting unknown entity "${relation.target}"`,
       );
     }
+  }
+}
+
+// Nested maps (brief §4.4): a map's parentEntity must be a real spatial
+// entity, and that entity's own `map` field (if set) should point back at
+// this map — otherwise the breadcrumb trail and the "Open map" link
+// disagree about where this map lives.
+for (const [mapId, { parentEntity, path }] of mapConfigsById) {
+  if (parentEntity === undefined) continue;
+  const entity = allFeaturesById.get(parentEntity);
+  if (!entity) {
+    fail(path, `parentEntity "${parentEntity}" is not a spatial entity`);
+  } else if (entity.properties.map !== undefined && entity.properties.map !== mapId) {
+    fail(
+      path,
+      `parentEntity "${parentEntity}" points back at map "${entity.properties.map}", not this map ("${mapId}")`,
+    );
   }
 }
 
