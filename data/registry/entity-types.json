@@ -1,0 +1,51 @@
+{
+  "nonSpatial": {
+    "concept": {},
+    "creature": {},
+    "culture": {},
+    "event": {},
+    "faction": {},
+    "item": {},
+    "note": {},
+    "person": {},
+    "religion": {}
+  },
+  "schemaVersion": 1,
+  "spatial": {
+    "label": {
+      "subtypes": []
+    },
+    "place": {
+      "subtypes": [
+        "city",
+        "town",
+        "village",
+        "fortress",
+        "port",
+        "temple",
+        "ruin",
+        "landmark",
+        "camp"
+      ]
+    },
+    "region": {
+      "subtypes": [
+        "country",
+        "province",
+        "biome",
+        "sea",
+        "forest",
+        "desert"
+      ]
+    },
+    "route": {
+      "subtypes": [
+        "road",
+        "river",
+        "sea-lane",
+        "trade-route",
+        "border"
+      ]
+    }
+  }
+}

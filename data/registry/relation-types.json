@@ -1,0 +1,50 @@
+{
+  "relations": {
+    "allied-with": {
+      "reciprocal": "allied-with"
+    },
+    "birthplace-of": {
+      "reciprocal": "born-in"
+    },
+    "born-in": {
+      "reciprocal": "birthplace-of"
+    },
+    "capital": {
+      "reciprocal": "capital-of"
+    },
+    "capital-of": {
+      "reciprocal": "capital"
+    },
+    "contains": {
+      "reciprocal": "located-in"
+    },
+    "enemy-of": {
+      "reciprocal": "enemy-of"
+    },
+    "has-member": {
+      "reciprocal": "member-of"
+    },
+    "located-in": {
+      "reciprocal": "contains"
+    },
+    "member-of": {
+      "reciprocal": "has-member"
+    },
+    "occurred-at": {
+      "reciprocal": "site-of"
+    },
+    "related-to": {
+      "reciprocal": "related-to"
+    },
+    "ruled-by": {
+      "reciprocal": "ruler-of"
+    },
+    "ruler-of": {
+      "reciprocal": "ruled-by"
+    },
+    "site-of": {
+      "reciprocal": "occurred-at"
+    }
+  },
+  "schemaVersion": 1
+}

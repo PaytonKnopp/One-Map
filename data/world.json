@@ -1,0 +1,74 @@
+{
+  "calendar": {
+    "currentYear": 1000,
+    "epochYear": 0,
+    "eraAfter": "AE",
+    "eraBefore": "BE",
+    "months": [
+      {
+        "days": 30,
+        "name": "Month 1"
+      },
+      {
+        "days": 30,
+        "name": "Month 2"
+      },
+      {
+        "days": 30,
+        "name": "Month 3"
+      },
+      {
+        "days": 30,
+        "name": "Month 4"
+      },
+      {
+        "days": 30,
+        "name": "Month 5"
+      },
+      {
+        "days": 30,
+        "name": "Month 6"
+      },
+      {
+        "days": 30,
+        "name": "Month 7"
+      },
+      {
+        "days": 30,
+        "name": "Month 8"
+      },
+      {
+        "days": 30,
+        "name": "Month 9"
+      },
+      {
+        "days": 30,
+        "name": "Month 10"
+      },
+      {
+        "days": 30,
+        "name": "Month 11"
+      },
+      {
+        "days": 30,
+        "name": "Month 12"
+      }
+    ],
+    "weekdays": [
+      "Day 1",
+      "Day 2",
+      "Day 3",
+      "Day 4",
+      "Day 5",
+      "Day 6"
+    ]
+  },
+  "defaultMap": "world",
+  "defaultTheme": "atlas",
+  "name": "One World",
+  "scale": {
+    "planeMetersPerUnit": 1000,
+    "unit": "world-km"
+  },
+  "schemaVersion": 1
+}
