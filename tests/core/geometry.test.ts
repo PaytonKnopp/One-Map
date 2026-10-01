@@ -9,6 +9,7 @@ import {
   planarDistanceMeters,
   polygonAreaSquareMeters,
   ringAreaSquareMeters,
+  ringCentroid,
   toMercator,
   worldUnitsToMeters,
 } from '../../src/core/geometry.ts';
@@ -133,6 +134,56 @@ describe('ringAreaSquareMeters / polygonAreaSquareMeters', () => {
     const outerOnly = ringAreaSquareMeters(outer);
     const holeOnly = ringAreaSquareMeters(hole);
     expect(polygonAreaSquareMeters([outer, hole])).toBeCloseTo(outerOnly - holeOnly, 3);
+  });
+});
+
+describe('ringCentroid', () => {
+  it('is near the center of an axis-aligned square', () => {
+    // Exact in x (mercator x is linear in lng); only approximate in y,
+    // since mercator y is a nonlinear (log-tan) function of lat, so the
+    // planar-mercator centroid isn't bit-identical to the plain lat average.
+    const ring: [number, number][] = [
+      [0, 0],
+      [0, 2],
+      [2, 2],
+      [2, 0],
+      [0, 0],
+    ];
+    const centroid = ringCentroid(ring);
+    expect(centroid.lng).toBeCloseTo(1, 6);
+    expect(centroid.lat).toBeCloseTo(1, 2);
+  });
+
+  it('gives the same centroid regardless of winding order', () => {
+    const ring: [number, number][] = [
+      [0, 0],
+      [0, 2],
+      [3, 2],
+      [3, 0],
+      [0, 0],
+    ];
+    const reversed = [...ring].reverse();
+    const a = ringCentroid(ring);
+    const b = ringCentroid(reversed);
+    expect(a.lng).toBeCloseTo(b.lng, 6);
+    expect(a.lat).toBeCloseTo(b.lat, 6);
+  });
+
+  it('is pulled toward the wider end of an asymmetric shape, unlike a plain vertex average', () => {
+    // An "L" shape: a wide bottom bar with a narrow tower on the left.
+    const lShape: [number, number][] = [
+      [0, 0],
+      [0, 3],
+      [1, 3],
+      [1, 1],
+      [3, 1],
+      [3, 0],
+      [0, 0],
+    ];
+    const centroid = ringCentroid(lShape);
+    // The plain average of the 6 distinct vertices would sit at x = 8/6 ≈ 1.33;
+    // the area-weighted centroid should be pulled further toward the bottom bar.
+    expect(centroid.lng).toBeLessThan(1.33);
   });
 });
 

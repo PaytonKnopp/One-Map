@@ -136,3 +136,34 @@ export function polygonAreaSquareMeters(rings: readonly (readonly [number, numbe
   const holesArea = holes.reduce((sum, hole) => sum + ringAreaSquareMeters(hole), 0);
   return Math.max(0, outerArea - holesArea);
 }
+
+/**
+ * The area-weighted centroid of a closed ring (planar, EPSG:3857), used to
+ * place a region's label. Falls back to the plain average of vertices for
+ * a degenerate (zero-area) ring, so it never divides by zero.
+ */
+export function ringCentroid(ring: readonly [number, number][]): LngLat {
+  const points = ring.map(([lng, lat]) => toMercator({ lng, lat }));
+  let signedAreaSum = 0;
+  let cx = 0;
+  let cy = 0;
+
+  for (let i = 0; i < points.length - 1; i++) {
+    const p1 = points[i]!;
+    const p2 = points[i + 1]!;
+    const cross = p1.x * p2.y - p2.x * p1.y;
+    signedAreaSum += cross;
+    cx += (p1.x + p2.x) * cross;
+    cy += (p1.y + p2.y) * cross;
+  }
+
+  if (signedAreaSum === 0) {
+    const n = Math.max(1, points.length - 1);
+    const avgX = points.slice(0, n).reduce((sum, p) => sum + p.x, 0) / n;
+    const avgY = points.slice(0, n).reduce((sum, p) => sum + p.y, 0) / n;
+    return fromMercator({ x: avgX, y: avgY });
+  }
+
+  const signedArea = signedAreaSum / 2;
+  return fromMercator({ x: cx / (6 * signedArea), y: cy / (6 * signedArea) });
+}

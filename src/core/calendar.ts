@@ -8,8 +8,10 @@ import type { CalendarConfig } from './schema/world.ts';
  */
 export interface DateKey {
   y: number;
-  m?: number;
-  d?: number;
+  // `| undefined` (not just `?:`) so this stays structurally assignable
+  // from Zod's inferred DateKeySchema output under exactOptionalPropertyTypes.
+  m?: number | undefined;
+  d?: number | undefined;
 }
 
 function daysPerYear(calendar: CalendarConfig): number {
