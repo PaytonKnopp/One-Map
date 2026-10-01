@@ -8,9 +8,10 @@ atlas with names, icons, regions, routes, lore, and history, built up over
 years. Plain-text data in Git — GeoJSON, Markdown, JSON — no database, no
 backend, deployed as a static site on GitHub Pages.
 
-> **Status:** Milestone 1 (Foundation) only — tooling, data schemas, and
-> core math modules exist; there is no map viewer yet. See
-> `docs/PROGRESS.md` for exactly what's built.
+> **Status:** Milestones 1–2 (Foundation, Map core) — there's a real
+> MapLibre viewer with a small tagged-`sample` seed world, but no lore
+> panel, search, or timeline yet. See `docs/PROGRESS.md` for exactly
+> what's built.
 
 ## How this is used
 
@@ -52,19 +53,28 @@ npm run format           # Prettier, for code (not data/lore — see .prettierig
 
 ## Adding content
 
-Not yet meaningful until the map viewer and lore pipeline exist (M2–M3).
-Once they do, this section documents the `npm run <script>` tools and
-points to `CLAUDE.md` for the full workflow. For now, the only editable
-data is `data/world.json` (world name, scale, calendar) and
-`data/registry/*.json` (entity/relation types) — edit directly, then
-`npm run format:data && npm run validate`.
+The full plain-language workflow (open Claude Code, describe what to
+add) needs the helper scripts from M5 to be comfortable — most of them
+don't exist yet. Today, spatial entities (places/regions/routes/free
+labels) can be hand-edited directly: add a GeoJSON Feature to a file
+under `data/maps/world/layers/<layer>/`, following the shape of the
+existing `sample-*.geojson` files and the field reference in
+`docs/DATA_MODEL.md`, then run `npm run format:data && npm run
+validate` and look at it with `npm run dev`. `data/world.json`,
+`data/registry/*.json`, `data/maps/world/map.json`, and
+`data/themes/atlas.json` are all editable the same way. See `CLAUDE.md`
+for the full editing rules (ID stability, consistency duty,
+destructive-change confirmation) even while the scripts that automate
+parts of this are still being built.
 
 ## Deploying
 
-Not set up yet (lands at M2). Planned: GitHub Actions builds and deploys
-to GitHub Pages on every push to `main`. The one manual step once that
-workflow exists: in the repo's GitHub settings, **Settings → Pages →
-Source: GitHub Actions**.
+GitHub Actions (`.github/workflows/ci.yml`) builds and deploys to
+GitHub Pages automatically on every push to `main`, after typecheck/
+lint/test/validate/build all pass. **One manual, one-time step**: in
+the repo's GitHub settings, **Settings → Pages → Source: GitHub
+Actions**. After that, pushing to `main` is the whole deploy process —
+no separate deploy command to run.
 
 ## Backup / restore
 

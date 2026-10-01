@@ -109,17 +109,132 @@ shows both directions automatically from a single stored `relations[]`
 entry on one entity — the reverse is never hand-maintained on the other
 entity (not yet implemented; lands with the info panel in M3).
 
-## Field ownership (not yet relevant — no spatial/lore entities exist yet)
+## `data/maps/<id>/map.json`
 
-Once entities exist (M2+): a spatial entity's structured fields live in
-its GeoJSON feature `properties`; its long-form text lives in
-`lore/<type>/<id>.md`, whose frontmatter holds only `id`/`type` plus any
-field not already present on the feature. `npm run validate` will reject
-a field defined in both places. Non-spatial entities are Markdown-only —
-all their fields live in frontmatter.
+One per map (the top-level world map is `data/maps/world/map.json`;
+nested maps, brief §4.4, get their own `<id>` from M4 on). Schema:
+`src/core/schema/map.ts` (`MapConfigSchema`).
+
+| Field                                     | Type                                                    | Notes                                                                                                                                                                                                                                              |
+| ----------------------------------------- | ------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `schemaVersion`                           | positive integer                                        |                                                                                                                                                                                                                                                    |
+| `id`                                      | kebab-case string                                       | Must match the directory name — `npm run validate` checks this.                                                                                                                                                                                    |
+| `name`                                    | string                                                  |                                                                                                                                                                                                                                                    |
+| `parentEntity`                            | id (optional)                                           | The entity this map is nested under (brief §4.4). Absent for the world map.                                                                                                                                                                        |
+| `unit`                                    | string                                                  | This map's own distance-unit display name — may differ from the world's (e.g. a city map might use `"m"`).                                                                                                                                         |
+| `planeMetersPerUnit`                      | positive number                                         | This map's own scale factor, independent of the world's.                                                                                                                                                                                           |
+| `theme`                                   | id (optional)                                           | Overrides `data/world.json`'s `defaultTheme` for this map. Must reference an existing `data/themes/<id>.json` (checked).                                                                                                                           |
+| `defaultView.center` / `defaultView.zoom` | `[lng, lat]` / number                                   | Where the viewer opens this map.                                                                                                                                                                                                                   |
+| `bounds`                                  | `[[minLng, minLat], [maxLng, maxLat]]`                  | Locks MapLibre's `maxBounds` — this map's canvas. For the world map this is (almost) the full Web Mercator extent; see `docs/DECISIONS.md` for why it's inset very slightly from the true `±180°`/`±85.0511288°`.                                  |
+| `minZoom` / `maxZoom`                     | number (optional)                                       |                                                                                                                                                                                                                                                    |
+| `layers`                                  | array of `{ id, name, types?, defaultVisible, zIndex }` | Declares every layer folder under this map's `layers/`. `types` (optional) restricts/documents which spatial entity `type`s belong in that layer — checked if set. `zIndex` controls draw order (higher paints on top) and must be unique per map. |
+
+A layer folder with no corresponding entry in `layers` is flagged by
+`npm run validate` ("exists on disk but isn't declared"). A declared
+layer with no folder yet is fine (just empty).
+
+## `data/maps/<id>/layers/<layer>/*.geojson`
+
+Any number of standard GeoJSON `FeatureCollection` files per layer
+folder — split them however makes sense (by region, era, whatever);
+they're merged at load time. Every feature's `properties` validates
+against one of four schemas based on `properties.type`
+(`src/core/schema/entity.ts`): `PlaceFeatureSchema` (Point geometry),
+`RegionFeatureSchema` (Polygon/MultiPolygon), `RouteFeatureSchema`
+(LineString), `LabelFeatureSchema` (Point or LineString, requires
+`text`).
+
+Common `properties` fields (every spatial entity):
+
+| Field         | Type                                                      | Notes                                                                                                                                                                                                                                           |
+| ------------- | --------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `id`          | kebab-case string                                         | Unique across the **whole repo**, not just this file/layer/map — checked by `npm run validate`.                                                                                                                                                 |
+| `type`        | `"place" \| "region" \| "route" \| "label"`               | Fixed by the data model; determines which geometry type is required.                                                                                                                                                                            |
+| `subtype`     | string (optional)                                         | Must be registered under this `type` in `data/registry/entity-types.json`.                                                                                                                                                                      |
+| `name`        | string (optional)                                         | Display name. Required in practice for anything that should show a label (labels use `text` instead — see below).                                                                                                                               |
+| `aliases`     | string[] (optional)                                       |                                                                                                                                                                                                                                                 |
+| `summary`     | string (optional)                                         | One line; shown in the click popup (full info panel lands M3).                                                                                                                                                                                  |
+| `tags`        | kebab-case string[] (optional)                            |                                                                                                                                                                                                                                                 |
+| `rank`        | integer 1–5 (optional, default `3`)                       | Controls the zoom level the icon/label appears at — see `src/core/rank.ts`. 1 = always visible from the map's `minZoom`; 5 = only once zoomed well in. The exact per-rank zoom offsets are in `src/core/rank.ts`'s `ZOOM_OFFSET_BY_RANK` table. |
+| `icon`        | string (optional)                                         | An id under `assets/icons/` (without `.svg`). Falls back to the entity's `subtype`, then to the generic `marker` icon, if unset/not found.                                                                                                      |
+| `from` / `to` | `DateKey` (optional)                                      | Existence span (brief §4.3). Open-ended if one side is omitted; no dates at all means "timeless," always visible regardless of the timeline (not built until M4).                                                                               |
+| `relations`   | array of `{ type, target, from?, to?, note? }` (optional) | `type` must be a registered relation (`data/registry/relation-types.json`); `target` must be another existing entity id. The reverse direction is computed from the registry's reciprocal label, never hand-maintained on the other entity.     |
+| `status`      | `"canon" \| "draft" \| "retired"` (default `"canon"`)     | See `CLAUDE.md`'s "Status and visibility."                                                                                                                                                                                                      |
+| `map`         | id (optional)                                             | A nested map this entity opens into (brief §4.4; viewer support lands M4).                                                                                                                                                                      |
+| `images`      | array of `{ src, alt, caption? }` (optional)              |                                                                                                                                                                                                                                                 |
+| `style`       | object (optional)                                         | Per-entity override, same shape as a theme's `TypeStyle` (`src/core/schema/theme.ts`). Not yet read by the viewer — layer styling currently only resolves from the theme; wiring this in is a small follow-up once a real use case needs it.    |
+| `text`        | string                                                    | **Required for `label`-type entities only** — the actual label text.                                                                                                                                                                            |
+| `rotation`    | number (optional)                                         | `label`-type, Point geometry only — rotates straight (non-curved) label text.                                                                                                                                                                   |
+
+**Field ownership**: all of the above lives in the GeoJSON feature's
+`properties` for a spatial entity. Its long-form lore body (if any)
+lives separately in `lore/<type>/<id>.md`, whose frontmatter holds only
+`id`/`type` plus any field not already present on the feature — the
+same field must never be defined in both places (`npm run validate`
+will reject that once the lore pipeline exists, M3). Non-spatial
+entities (`person`, `faction`, …) are Markdown-only; every field lives
+in frontmatter.
+
+**Computed, never stored**: which region(s) a place geometrically sits
+inside, what a region contains, nearest neighbors, and route
+lengths/region areas in world units are all _derived_ at build/load
+time (brief §6) — never hand-written as data. In particular, don't add
+a `located-in`/`contains` relation for plain geometric containment
+(e.g. "this village is inside this country" when the village's point
+literally falls within the country's polygon) — that's exactly what
+the (not-yet-built, M3) computed-facts pass is for. Reserve `relations`
+for facts geometry alone can't tell you (`capital-of`, `ruler-of`,
+`member-of`, …). The sample data (`data/maps/world/layers/`)
+deliberately only records `sampleton`'s `capital-of` relation this way,
+as a worked example.
+
+## `data/themes/<id>.json`
+
+Fully data-driven map styling — adding a theme is a new JSON file, no
+code change. Schema: `src/core/schema/theme.ts` (`ThemeSchema`).
+
+| Field                             | Type                                        | Notes                                                                                                                                                                                   |
+| --------------------------------- | ------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `schemaVersion`                   | positive integer                            |                                                                                                                                                                                         |
+| `id`                              | kebab-case string                           | Must match the filename.                                                                                                                                                                |
+| `name`                            | string                                      |                                                                                                                                                                                         |
+| `background`                      | hex color                                   | The canvas/ocean background.                                                                                                                                                            |
+| `fonts.decorative` / `fonts.sans` | string                                      | CSS `font-family` names — must be a family actually loaded (currently Cinzel / Inter via `@fontsource/*`, see `docs/DECISIONS.md` and `docs/ASSETS.md`).                                |
+| `default`                         | `TypeStyle`                                 | Fallback style for anything `byType`/`bySubtype` don't cover.                                                                                                                           |
+| `byType`                          | map of entity type → `TypeStyle` (optional) |                                                                                                                                                                                         |
+| `bySubtype`                       | map of subtype → `TypeStyle` (optional)     | Wins over `byType`, which wins over `default` — merged field-by-field (including one level into `label`), not replaced wholesale. See `resolveTypeStyle` in `src/core/schema/theme.ts`. |
+
+A `TypeStyle` is: `fill`, `fillOpacity`, `stroke`, `strokeWidth`,
+`lineDasharray`, `pointColor`, `pointRadius` (all optional), plus a
+nested `label` object (`font`: `"decorative"`\|`"sans"`, `color`,
+`haloColor`, `haloWidth`, `size`, `letterSpacing`, `uppercase`).
+
+Labels are rendered as a DOM/SVG overlay, not MapLibre symbol-layer
+text — see `docs/DECISIONS.md`'s "Labels" entry for why, and
+`src/map/LabelOverlay.tsx` for the renderer. `size` is the label's font
+size in CSS px; there is currently no additional per-rank size scaling
+beyond whatever `byType`/`bySubtype` already encode (e.g. `region`
+labels are simply styled bigger in `atlas.json`).
+
+Ships with one theme so far: `atlas` ("clean, modern" per brief §9).
+`parchment` lands at M4.
+
+## `assets/`
+
+Doubles as Vite's `publicDir` (see `docs/DECISIONS.md`) — everything
+under it is served verbatim at the site root, fetchable at runtime
+(`${import.meta.env.BASE_URL}icons/city.svg`, etc.), not bundled into
+the JS. `assets/icons/*.svg` are the icon source files (one per id,
+referenced from `properties.icon`); `assets/icons/sprite.svg` is a
+generated `<symbol>`-sprite build artifact (`npm run icons`) for future
+DOM UI use (M3+) — map markers themselves rasterize the individual
+source SVGs directly (`src/map/icons.ts`), not the sprite. Fonts are
+_not_ placed here — see `docs/DECISIONS.md`, they're self-hosted via
+`@fontsource/*` npm packages instead. Full licensing/attribution log:
+`docs/ASSETS.md`.
 
 ## What doesn't exist yet
 
-`data/maps/`, `data/themes/`, `lore/<type>/*.md` (beyond the placeholder
-`lore/_world-bible.md`), and `assets/` are not created until later
-milestones reference them — see `docs/PROGRESS.md`.
+`lore/<type>/*.md` (beyond the placeholder `lore/_world-bible.md`) and
+nested maps are not created until later milestones reference them — see
+`docs/PROGRESS.md`.

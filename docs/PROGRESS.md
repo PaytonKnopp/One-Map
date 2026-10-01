@@ -32,13 +32,46 @@ state on Windows.
 
 ## M2 — Map core
 
-- [ ] MapLibre viewer, `atlas` theme
-- [ ] `data/maps/world/map.json` + layer folders
-- [ ] Zoom-dependent labels/icons; resolve the fontnik-vs-DOM-overlay font
-      question (`docs/DECISIONS.md`)
-- [ ] Custom planar scale bar (not MapLibre's geodesic `ScaleControl`)
-- [ ] Minimal seed data
-- [ ] GitHub Pages deploy workflow added to CI; site live
+- [x] MapLibre viewer, `atlas` theme
+- [x] `data/maps/world/map.json` + layer folders (`regions`, `routes`,
+      `labels`, `places`)
+- [x] Zoom-dependent labels/icons by `rank` (`src/core/rank.ts`); fontnik
+      rejected (fails to build — no `cmake` — see `docs/DECISIONS.md`) in
+      favor of a DOM/SVG label overlay (`src/map/LabelOverlay.tsx`),
+      including curved text along routes via `<textPath>`
+- [x] Custom planar scale bar (`src/map/ScaleBar.tsx`) + coordinate
+      readout (`src/map/CoordinateReadout.tsx`) — pulled forward from the
+      M4 checklist since they're basic map chrome, not a separate feature
+- [x] Minimal seed data, tagged `sample` (one country + sea, a river +
+      road, 3 places of different ranks/subtypes, one free label) — built
+      to already match brief §12's shape so M5 only needs to _expand_ it,
+      not redo it
+- [x] Icon set: 10 Lucide SVGs + `scripts/icons.ts` sprite builder —
+      pulled forward from M5 since the viewer needed real icons to render
+- [x] GitHub Pages deploy workflow added to CI (`.github/workflows/ci.yml`
+      `deploy` job, gated on `main`)
+
+**Two real bugs found and fixed while building this** (both documented
+in `docs/DECISIONS.md` with the full diagnosis):
+
+1. MapLibre's worker fails to load once bundled by Vite (its relative
+   worker-URL lookup breaks, and the worker's own sibling-chunk import
+   breaks too) — no GeoJSON source renders until fixed. Fixed via a
+   small Vite plugin that copies both worker files to a stable
+   `publicDir` path.
+2. Setting `maxBounds` to the _exact_ full Mercator extent crashes
+   MapLibre's internal `_calcMatrices` on resize. Fixed by insetting the
+   canvas bounds very slightly (`±179°`/`±84°` instead of `±180°`/
+   `±85.0511288°`).
+
+**Verification:** `npm run validate`/`test`/`build` all pass (see
+below), plus a one-off Playwright check (chromium, not committed —
+`npm run snapshot`, the real tool for this, is M5) confirming: the map
+renders real fill/line/icon layers (not just the background), all 8
+sample labels show including two curved route labels, the scale bar
+reads a sensible value, clicking a place icon opens a popup with its
+name/summary, and zooming works with no console errors beyond benign
+headless-GPU driver warnings.
 
 ## M3 — Info layer
 
@@ -51,17 +84,19 @@ state on Windows.
 - [ ] Timeline slider
 - [ ] Nested maps + breadcrumbs
 - [ ] `parchment` theme + switcher
-- [ ] Measure tool, scale bar, coordinate readout
+- [ ] Measure tool (scale bar + coordinate readout already done in M2)
 - [ ] Chronicle page (from git log) + About/Stats page
 
 ## M5 — Tooling
 
 - [ ] Remaining helper scripts: `find`, `show`, `where`, `offset`,
       `measure`, `shape`, `add`, `rename-id`, `move`, `delete`, `snapshot`
-      (Playwright), `export`, `icons`, `fonts`, `new-map`, `new-layer`,
-      `new-type`, `clear-sample`
-- [ ] Full sample world content (tagged `sample`, removable via
-      `clear-sample`)
+      (Playwright), `export`, `new-map`, `new-layer`, `new-type`,
+      `clear-sample` (`icons` already done in M2)
+- [ ] Expand the M2 seed data into the full brief §12 sample content
+      (2 people, 2 factions, 3 events across different years, a nested
+      city map, wiki links, a draft entity) — it's already tagged
+      `sample` and structured to extend, not redo
 - [ ] `.claude/commands/*`, `.claude/settings.json`
 
 ## M6 — Hardening
@@ -81,8 +116,15 @@ state on Windows.
   Payton's naming.
 - World name (`data/world.json` → `name`) — currently the literal
   placeholder `"One World"`.
-- Theme colors/fonts for `atlas`/`parchment` — will be built with
-  reasonable defaults at M2/M4; Payton can restyle anytime via
-  `data/themes/*.json`, no code change needed.
-- Font glyph generation tool (`fontnik`) — unverified on Windows/Node 24;
-  see `docs/DECISIONS.md`. Will resolve at M2.
+- Theme colors for `atlas` (built, reasonable defaults) and `parchment`
+  (M4) — Payton can restyle anytime via `data/themes/*.json`, no code
+  change needed.
+- The JS bundle is ~1.37 MB (~380 KB gzip), mostly MapLibre GL JS itself
+  — normal for a WebGL map library, but flagged for the M6 performance
+  check; dynamic `import()` code-splitting is the lever if it ever needs
+  to come down.
+- `properties.style` (per-entity style override) is defined in the
+  schema (`docs/DATA_MODEL.md`) but not yet read by the viewer — theme
+  `byType`/`bySubtype` resolution covers every subtype so far; wiring in
+  the per-entity override is a small follow-up once something actually
+  needs it.
