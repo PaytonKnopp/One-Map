@@ -501,3 +501,17 @@ non-destructive work. Every script that writes or deletes content
 still prompt, consistent with `CLAUDE.md`'s destructive-change rule —
 and force-push/`reset --hard`/`clean`/`rebase`/`commit --amend` are
 explicitly denied.
+
+## 2026-10-01 — No Dependabot version-update PRs; dependencies updated on purpose
+
+Payton wants this to be a stable personal project, not a stream of bot
+pull requests (the first one, a grouped ESLint 10 bump, couldn't even
+install because `eslint-plugin-jsx-a11y` doesn't support ESLint 10
+yet). Every dependency is pinned to an exact version and
+`package-lock.json` is committed, and the deployed site is static
+files, so nothing breaks by standing still. `.github/dependabot.yml` was
+removed. Dependencies and GitHub Actions versions get updated
+deliberately instead, in one `chore:` commit, when there's a reason:
+a security advisory that actually affects the shipped site, a feature
+that needs a newer library, or CI/deploy breaking because GitHub
+retired an old Actions runtime.
