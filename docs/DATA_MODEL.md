@@ -111,27 +111,38 @@ entity (not yet implemented; lands with the info panel in M3).
 
 ## `data/maps/<id>/map.json`
 
-One per map (the top-level world map is `data/maps/world/map.json`;
-nested maps, brief §4.4, get their own `<id>` from M4 on). Schema:
-`src/core/schema/map.ts` (`MapConfigSchema`).
+One per map: the top-level world map (`data/maps/world/map.json`) and
+any nested map (brief §4.4 — e.g. `data/maps/sampleton-city/map.json`,
+the sample nested city map), each with its own id, scale, bounds, and
+layers. Schema: `src/core/schema/map.ts` (`MapConfigSchema`).
 
-| Field                                     | Type                                                    | Notes                                                                                                                                                                                                                                              |
-| ----------------------------------------- | ------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `schemaVersion`                           | positive integer                                        |                                                                                                                                                                                                                                                    |
-| `id`                                      | kebab-case string                                       | Must match the directory name — `npm run validate` checks this.                                                                                                                                                                                    |
-| `name`                                    | string                                                  |                                                                                                                                                                                                                                                    |
-| `parentEntity`                            | id (optional)                                           | The entity this map is nested under (brief §4.4). Absent for the world map.                                                                                                                                                                        |
-| `unit`                                    | string                                                  | This map's own distance-unit display name — may differ from the world's (e.g. a city map might use `"m"`).                                                                                                                                         |
-| `planeMetersPerUnit`                      | positive number                                         | This map's own scale factor, independent of the world's.                                                                                                                                                                                           |
-| `theme`                                   | id (optional)                                           | Overrides `data/world.json`'s `defaultTheme` for this map. Must reference an existing `data/themes/<id>.json` (checked).                                                                                                                           |
-| `defaultView.center` / `defaultView.zoom` | `[lng, lat]` / number                                   | Where the viewer opens this map.                                                                                                                                                                                                                   |
-| `bounds`                                  | `[[minLng, minLat], [maxLng, maxLat]]`                  | Locks MapLibre's `maxBounds` — this map's canvas. For the world map this is (almost) the full Web Mercator extent; see `docs/DECISIONS.md` for why it's inset very slightly from the true `±180°`/`±85.0511288°`.                                  |
-| `minZoom` / `maxZoom`                     | number (optional)                                       |                                                                                                                                                                                                                                                    |
-| `layers`                                  | array of `{ id, name, types?, defaultVisible, zIndex }` | Declares every layer folder under this map's `layers/`. `types` (optional) restricts/documents which spatial entity `type`s belong in that layer — checked if set. `zIndex` controls draw order (higher paints on top) and must be unique per map. |
+| Field                                     | Type                                                                     | Notes                                                                                                                                                                                                                                                                              |
+| ----------------------------------------- | ------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `schemaVersion`                           | positive integer                                                         |                                                                                                                                                                                                                                                                                    |
+| `id`                                      | kebab-case string                                                        | Must match the directory name — `npm run validate` checks this.                                                                                                                                                                                                                    |
+| `name`                                    | string                                                                   |                                                                                                                                                                                                                                                                                    |
+| `parentEntity`                            | id (optional)                                                            | The entity this map is nested under (brief §4.4). Absent for the world map.                                                                                                                                                                                                        |
+| `unit`                                    | string                                                                   | This map's own distance-unit display name — may differ from the world's (e.g. a city map might use `"m"`).                                                                                                                                                                         |
+| `planeMetersPerUnit`                      | positive number                                                          | This map's own scale factor, independent of the world's.                                                                                                                                                                                                                           |
+| `theme`                                   | id (optional)                                                            | Overrides `data/world.json`'s `defaultTheme` for this map. Must reference an existing `data/themes/<id>.json` (checked).                                                                                                                                                           |
+| `defaultView.center` / `defaultView.zoom` | `[lng, lat]` / number                                                    | Where the viewer opens this map.                                                                                                                                                                                                                                                   |
+| `bounds`                                  | `[[minLng, minLat], [maxLng, maxLat]]`                                   | Locks MapLibre's `maxBounds` — this map's canvas. For the world map this is (almost) the full Web Mercator extent; see `docs/DECISIONS.md` for why it's inset very slightly from the true `±180°`/`±85.0511288°`.                                                                  |
+| `minZoom` / `maxZoom`                     | number (optional)                                                        |                                                                                                                                                                                                                                                                                    |
+| `layers`                                  | array of `{ id, name, types?, defaultVisible, zIndex }`                  | Declares every layer folder under this map's `layers/`. `types` (optional) restricts/documents which spatial entity `type`s belong in that layer — checked if set. `zIndex` controls draw order (higher paints on top) and must be unique per map.                                 |
+| `artLayers`                               | array of `{ id, name, src, bounds, opacity, defaultVisible }` (optional) | Raster image/tile underlay hook (brief §9) — `src` is a path under `assets/` (checked to exist), `bounds` its 4 corners (top-left, top-right, bottom-right, bottom-left — MapLibre's `image` source convention). No art exists anywhere in this repo yet; this is purely the hook. |
 
 A layer folder with no corresponding entry in `layers` is flagged by
 `npm run validate` ("exists on disk but isn't declared"). A declared
 layer with no folder yet is fine (just empty).
+
+**Nested maps** (brief §4.4): `parentEntity` names the spatial entity
+this map belongs under; that entity's own feature should set its
+`map` field (`docs/DATA_MODEL.md`'s layer-file section) to point back
+at this map's `id`. Both directions are checked by `npm run validate`
+(each must resolve, and they must agree with each other). The info
+panel's "Open map" button and the breadcrumb trail
+(`src/ui/Breadcrumbs.tsx`) both read these two fields — see
+`docs/DECISIONS.md`.
 
 ## `data/maps/<id>/layers/<layer>/*.geojson`
 
@@ -216,8 +227,12 @@ size in CSS px; there is currently no additional per-rank size scaling
 beyond whatever `byType`/`bySubtype` already encode (e.g. `region`
 labels are simply styled bigger in `atlas.json`).
 
-Ships with one theme so far: `atlas` ("clean, modern" per brief §9).
-`parchment` lands at M4.
+Ships with two themes: `atlas` ("clean, modern" per brief §9) and
+`parchment` (warm, old-map feel — leans harder on the decorative font;
+see `docs/DECISIONS.md` for what it deliberately doesn't do yet —
+textured fill patterns). The theme switcher (`src/ui/ThemeSwitcher.tsx`)
+lists every `data/themes/*.json` automatically — adding a third theme
+needs no code change.
 
 ## `assets/`
 
@@ -281,11 +296,61 @@ separate build artifact — see `docs/DECISIONS.md`).
 ## Routing and deep links
 
 Hash-based (brief §3): `#/?e=<id>` opens that entity's info panel over
-the map (brief's "a deep link for every entity"); `#/browse?...` opens
-the Browse view. `src/routing/useHashRoute.ts` is the whole router — no
-routing library; see `docs/DECISIONS.md`. Back/forward works via the
-browser's native history, since setting `location.hash` already pushes
-an entry.
+the map (brief's "a deep link for every entity"). `src/routing/
+useHashRoute.ts` is the whole router — no routing library; see
+`docs/DECISIONS.md`. Back/forward works via the browser's native
+history, since setting `location.hash` already pushes an entry.
+
+| Path        | Opens                           |
+| ----------- | ------------------------------- |
+| `` (empty)  | The map — brief's default view. |
+| `browse`    | The Browse/Index view.          |
+| `chronicle` | The World Chronicle page.       |
+| `about`     | The About/Stats page.           |
+
+| Query param | Meaning                                                                                                                    |
+| ----------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `e`         | The selected entity id — opens its info panel.                                                                             |
+| `map`       | The current map id. Absent means `data/world.json`'s `defaultMap`.                                                         |
+| `theme`     | A theme id overriding the current map's own `theme` (and the world default) for this viewing session — the theme switcher. |
+
+`map`/`theme` are carried forward across every navigation (opening
+Browse, picking a search result, …) — see `docs/DECISIONS.md` for a
+bug this caught. The timeline year and the measure tool's state are
+**not** in the URL (plain React state in `App.tsx`) — scrubbing the
+timeline isn't meant to be a shareable/bookmarkable moment.
+
+## Timeline (brief §4.3)
+
+`src/map/timeline.ts` turns an entity's `from`/`to` into sortable
+numbers (`src/core/calendar.ts`'s `toSortKey`), with large sentinel
+constants (`OPEN_START`/`OPEN_END`) standing in for an unset side
+(open-ended) — an entity with neither is timeless and always visible,
+regardless of the slider. Dragging the slider doesn't rebuild the map;
+it calls `map.setFilter`/`setPaintProperty` on the already-added
+layers (`src/map/MapView.tsx`'s `updateTimelineStyling`) and re-filters
+the label overlay the same way. The "ghost" toggle swaps hiding
+out-of-range entities for dimming them (25% opacity for map layers,
+35% for labels) instead of hiding them.
+
+## Measure tool (brief §8)
+
+`src/map/MeasureTool.tsx` — click two points on the map; shows the
+planar distance (`src/core/geometry.ts`'s `planarDistanceMeters`,
+converted to the current map's world units) and, if `data/world.json`'s
+`scale.travelSpeeds` defines any speeds, a rough travel-time estimate
+using the fastest one. Resets when toggled off.
+
+## Chronicle and About pages (brief §8)
+
+The World Chronicle (`src/ui/ChroniclePage.tsx`) reads `virtual:chronicle`,
+a Vite virtual module that runs `git log` at dev-server-start/build
+time (`vite.config.ts`'s `chroniclePlugin`) — see `docs/DECISIONS.md`
+for why this is a virtual module and not a generated file. The About
+page (`src/ui/AboutPage.tsx`) computes entity counts by type, map
+count, and total region area (world map only, in the world's own
+units) directly from the loaded entity graph — nothing here is stored,
+all of it is derived at view time.
 
 ## Search (`src/content/search.ts`)
 
@@ -295,5 +360,6 @@ on every page load from the same in-memory entity graph.
 
 ## What doesn't exist yet
 
-Nested maps aren't created until a later milestone references them
-(M4) — see `docs/PROGRESS.md`.
+See `docs/PROGRESS.md` for what M5/M6 still add (the remaining helper
+scripts, the full sample world, accessibility/mobile/performance
+passes).

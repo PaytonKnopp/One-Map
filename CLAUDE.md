@@ -14,16 +14,17 @@ No database, no backend. Everything the site needs is in this repo or
 generated at build time. The repo is **public** — see "Public repo" below.
 
 > **Build status:** as of 2026-10-01 this project has completed
-> Milestones 1–3 (Foundation, Map core, Info layer) of the plan in the
-> original build brief. A real map viewer exists (MapLibre + the `atlas`
-> theme + a small tagged-`sample` seed world), with a working info panel,
-> lore rendering + wiki links, search, and a browse view. There's no
-> timeline, nested-map support, or `parchment` theme yet, and most of the
-> helper scripts this file describes **do not exist yet**. Check
-> `docs/PROGRESS.md` before assuming a script/feature below is built — it
-> lists exactly what's done. Sections below describe the target workflow
-> once later milestones land; where something isn't built yet, PROGRESS.md
-> is the source of truth, not this file's aspirational description.
+> Milestones 1–4 (Foundation, Map core, Info layer, Depth) of the plan in
+> the original build brief. A real map viewer exists (MapLibre, two
+> themes with a switcher, a small tagged-`sample` seed world including a
+> nested city map) with a working info panel, lore rendering + wiki
+> links, search, a browse view, a timeline, a measure tool, and
+> chronicle/about pages. Most of the helper scripts this file describes
+> **do not exist yet** (M5). Check `docs/PROGRESS.md` before assuming a
+> script/feature below is built — it lists exactly what's done. Sections
+> below describe the target workflow once later milestones land; where
+> something isn't built yet, PROGRESS.md is the source of truth, not
+> this file's aspirational description.
 
 ## The standard edit workflow
 

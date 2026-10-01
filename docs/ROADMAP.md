@@ -11,8 +11,11 @@ it.
 - In-browser visual editor (dev-server file writing)
 - Inbox / quick-capture for jotting ideas before they're placed
 - PMTiles build step (see `docs/SCALING.md` — planned, just not built yet)
-- Painted raster art layers (the hook for art-layer overlays is built in
-  M2; no actual art tooling)
+- Painted raster art layers: the _hook_ is built (`map.json`'s
+  `artLayers`, rendered in `src/map/MapView.tsx` — M4) and a theme can
+  declare fill-pattern textures once the `TypeStyle` schema grows a
+  pattern field (not yet — see `docs/DECISIONS.md`'s parchment entry);
+  no actual art or pattern tiles exist anywhere in this repo
 - Azgaar's Fantasy Map Generator / Wonderdraft import
 - Relationship graph view (visual graph of entity relations, distinct
   from the backlinks list in the info panel)

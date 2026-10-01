@@ -8,11 +8,13 @@ atlas with names, icons, regions, routes, lore, and history, built up over
 years. Plain-text data in Git — GeoJSON, Markdown, JSON — no database, no
 backend, deployed as a static site on GitHub Pages.
 
-> **Status:** Milestones 1–3 (Foundation, Map core, Info layer) — a real
-> MapLibre viewer, info panel, lore rendering with wiki links, search,
-> and a browse view, over a small tagged-`sample` seed world. No
-> timeline or nested maps yet. See `docs/PROGRESS.md` for exactly what's
-> built.
+> **Status:** Milestones 1–4 (Foundation, Map core, Info layer, Depth) —
+> a real MapLibre viewer with two switchable themes, info panel, lore
+> rendering with wiki links, search, a browse view, a nested city map
+> with breadcrumbs, a timeline, a measure tool, and chronicle/about
+> pages, over a small tagged-`sample` seed world. Most of the editing
+> scripts (M5) and the hardening pass (M6) are still ahead. See
+> `docs/PROGRESS.md` for exactly what's built.
 
 ## How this is used
 

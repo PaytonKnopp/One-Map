@@ -131,11 +131,47 @@ all 9 entities (8 spatial + 1 non-spatial) with working filters.
 
 ## M4 — Depth
 
-- [ ] Timeline slider
-- [ ] Nested maps + breadcrumbs
-- [ ] `parchment` theme + switcher
-- [ ] Measure tool (scale bar + coordinate readout already done in M2)
-- [ ] Chronicle page (from git log) + About/Stats page
+- [x] Timeline slider (`src/ui/Timeline.tsx`): year range derived from
+      every entity's dates, "Now" reset, a "ghost" toggle that dims
+      out-of-range entities instead of hiding them. Map layers and
+      labels both respect it (`src/map/timeline.ts`,
+      `MapView.tsx`'s `updateTimelineStyling`, `LabelOverlay.tsx`)
+- [x] Nested maps + breadcrumbs: a sample nested city map
+      (`data/maps/sampleton-city/`, 2 places) under `sampleton`;
+      `parentEntity` ↔ `properties.map` cross-checked both ways by
+      `npm run validate`; breadcrumbs (`src/ui/Breadcrumbs.tsx`) and
+      the info panel's "Open map" button both wired up
+- [x] `parchment` theme (`data/themes/parchment.json`) + a theme
+      switcher (`src/ui/ThemeSwitcher.tsx`) — lists every
+      `data/themes/*.json` automatically, no code change to add a third
+- [x] Measure tool (`src/map/MeasureTool.tsx`) — click two points, see
+      the planar distance (+ travel time if `scale.travelSpeeds` is
+      ever set); scale bar + coordinate readout were already done in M2
+- [x] Chronicle page (`src/ui/ChroniclePage.tsx`, reading
+      `virtual:chronicle` — a Vite plugin wrapping `git log`, not a
+      generated file, see `docs/DECISIONS.md`) + About/Stats page
+      (`src/ui/AboutPage.tsx`)
+- [x] Raster art-layer hook (brief §9, originally scoped for M2 but
+      missed there — caught and built now): `map.json`'s `artLayers`
+      schema + rendering in `MapView.tsx`, `src` existence checked by
+      `npm run validate`. No actual art anywhere; purely the hook.
+
+**One real bug found and fixed** (documented in `docs/DECISIONS.md`):
+switching to Browse/Chronicle/About originally dropped the current
+`map`/`theme` route params (each view's `navigate()` call forgot to
+carry them forward) — caught by testing in a real browser, not assumed
+correct from reading the code.
+
+**Verification:** `npm run validate`/`test`/`build` all pass, plus a
+one-off Playwright check (not committed) confirming, in a real browser:
+opening Sampleton's nested map and seeing its two places at the right
+scale (200m bar, not world-km); the breadcrumb trail and the ability
+to navigate back to World from it; the theme switcher actually
+changing the rendered colors/fonts and surviving a navigation to
+Chronicle/About; the timeline slider updating its year label; the
+measure tool drawing a line and a correct-looking distance between two
+clicked points; Chronicle showing real commit history grouped by date;
+About showing correct live-computed stats.
 
 ## M5 — Tooling
 
@@ -143,10 +179,10 @@ all 9 entities (8 spatial + 1 non-spatial) with working filters.
       `measure`, `shape`, `add`, `rename-id`, `move`, `delete`, `snapshot`
       (Playwright), `export`, `new-map`, `new-layer`, `new-type`,
       `clear-sample` (`icons` already done in M2)
-- [ ] Expand the M2 seed data into the full brief §12 sample content
-      (2 people, 2 factions, 3 events across different years, a nested
-      city map, wiki links, a draft entity) — it's already tagged
-      `sample` and structured to extend, not redo
+- [ ] Expand the M2/M3 seed data into the full brief §12 sample content
+      (2 people — have 1 — 2 factions, 3 events across different years,
+      a draft entity) — already tagged `sample`, a nested city map
+      already exists, and already structured to extend, not redo
 - [ ] `.claude/commands/*`, `.claude/settings.json`
 
 ## M6 — Hardening
@@ -166,13 +202,13 @@ all 9 entities (8 spatial + 1 non-spatial) with working filters.
   Payton's naming.
 - World name (`data/world.json` → `name`) — currently the literal
   placeholder `"One World"`.
-- Theme colors for `atlas` (built, reasonable defaults) and `parchment`
-  (M4) — Payton can restyle anytime via `data/themes/*.json`, no code
-  change needed.
-- The JS bundle is ~1.37 MB (~380 KB gzip), mostly MapLibre GL JS itself
-  — normal for a WebGL map library, but flagged for the M6 performance
-  check; dynamic `import()` code-splitting is the lever if it ever needs
-  to come down.
+- Theme colors for `atlas` and `parchment` (both built, reasonable
+  defaults) — Payton can restyle anytime via `data/themes/*.json`, no
+  code change needed.
+- The JS bundle is ~1.6 MB (~455 KB gzip), mostly MapLibre GL JS +
+  react-markdown/remark/rehype — normal for what this app does, but
+  flagged for the M6 performance check; dynamic `import()`
+  code-splitting is the lever if it ever needs to come down.
 - `properties.style` (per-entity style override) is defined in the
   schema (`docs/DATA_MODEL.md`) but not yet read by the viewer — theme
   `byType`/`bySubtype` resolution covers every subtype so far; wiring in
@@ -187,5 +223,12 @@ all 9 entities (8 spatial + 1 non-spatial) with working filters.
   the production build by default, visible in dev / via a toggle) isn't
   wired up yet — `BrowseView` currently defaults `draft` to visible
   unconditionally. A real show/hide toggle (and a build-time env check)
-  is a small follow-up, probably natural to bundle with the M4
-  `parchment` theme switcher UI work.
+  is a small follow-up.
+- The raster art-layer hook (`map.json`'s `artLayers`) is wired into
+  `MapView.tsx` but has never been exercised with a real image — worth
+  a quick real test (any placeholder raster + 4 corner coordinates) the
+  first time actual painted art shows up, in case something about the
+  `image` source/coordinate-order assumption is off.
+- `data/world.json`'s `scale.travelSpeeds` is still unset, so the
+  measure tool never shows a travel-time estimate — cosmetic until
+  Payton defines at least one speed (e.g. walking/horse/ship).
