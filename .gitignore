@@ -5,6 +5,9 @@ node_modules/
 dist/
 *.tsbuildinfo
 
+# Vendor files copied from node_modules at dev/build time (see vite.config.ts)
+assets/vendor/
+
 # Private, never-published content (see CLAUDE.md)
 private/
 

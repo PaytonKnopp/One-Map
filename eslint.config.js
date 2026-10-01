@@ -15,6 +15,7 @@ export default tseslint.config(
       'private/**',
       'backups/**',
       '.stress/**',
+      'assets/vendor/**',
     ],
   },
   js.configs.recommended,
