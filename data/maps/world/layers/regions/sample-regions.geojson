@@ -1,0 +1,89 @@
+{
+  "features": [
+    {
+      "geometry": {
+        "coordinates": [
+          [
+            [
+              0,
+              -2
+            ],
+            [
+              0,
+              2
+            ],
+            [
+              4,
+              2
+            ],
+            [
+              4,
+              -2
+            ],
+            [
+              0,
+              -2
+            ]
+          ]
+        ],
+        "type": "Polygon"
+      },
+      "properties": {
+        "id": "sample-country",
+        "name": "Sample Country",
+        "rank": 1,
+        "status": "canon",
+        "subtype": "country",
+        "summary": "A placeholder country demonstrating region rendering. Replace or delete freely.",
+        "tags": [
+          "sample"
+        ],
+        "type": "region"
+      },
+      "type": "Feature"
+    },
+    {
+      "geometry": {
+        "coordinates": [
+          [
+            [
+              4,
+              -2
+            ],
+            [
+              4,
+              2
+            ],
+            [
+              8,
+              2
+            ],
+            [
+              8,
+              -2
+            ],
+            [
+              4,
+              -2
+            ]
+          ]
+        ],
+        "type": "Polygon"
+      },
+      "properties": {
+        "id": "sample-sea",
+        "name": "Sample Sea",
+        "rank": 1,
+        "status": "canon",
+        "subtype": "sea",
+        "summary": "A placeholder sea east of Sample Country.",
+        "tags": [
+          "sample"
+        ],
+        "type": "region"
+      },
+      "type": "Feature"
+    }
+  ],
+  "type": "FeatureCollection"
+}

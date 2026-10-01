@@ -1,0 +1,115 @@
+{
+  "background": "#aad3df",
+  "bySubtype": {
+    "biome": {
+      "fill": "#d8e8d0",
+      "fillOpacity": 0.8
+    },
+    "border": {
+      "lineDasharray": [
+        4,
+        3
+      ],
+      "stroke": "#6a6f5f",
+      "strokeWidth": 1
+    },
+    "country": {
+      "fill": "#eef0e2",
+      "fillOpacity": 0.8,
+      "stroke": "#8a8f7a",
+      "strokeWidth": 1.5
+    },
+    "desert": {
+      "fill": "#e8d9a0",
+      "fillOpacity": 0.85
+    },
+    "forest": {
+      "fill": "#bcd9b0",
+      "fillOpacity": 0.85
+    },
+    "province": {
+      "fillOpacity": 0,
+      "lineDasharray": [
+        4,
+        3
+      ],
+      "stroke": "#8a8f7a",
+      "strokeWidth": 1
+    },
+    "river": {
+      "stroke": "#4e8fb3",
+      "strokeWidth": 2
+    },
+    "road": {
+      "stroke": "#c9a227",
+      "strokeWidth": 2
+    },
+    "sea": {
+      "fill": "#aad3df",
+      "fillOpacity": 1,
+      "stroke": "#7fb3c4",
+      "strokeWidth": 1
+    },
+    "sea-lane": {
+      "lineDasharray": [
+        1,
+        3
+      ],
+      "stroke": "#4e8fb3",
+      "strokeWidth": 1.5
+    },
+    "trade-route": {
+      "lineDasharray": [
+        1,
+        3
+      ],
+      "stroke": "#c9a227",
+      "strokeWidth": 1.5
+    }
+  },
+  "byType": {
+    "place": {
+      "label": {
+        "size": 12
+      },
+      "pointRadius": 6
+    },
+    "region": {
+      "label": {
+        "font": "decorative",
+        "letterSpacing": 2,
+        "size": 16,
+        "uppercase": true
+      }
+    },
+    "route": {
+      "fillOpacity": 0,
+      "stroke": "#8a7a4a",
+      "strokeWidth": 2
+    }
+  },
+  "default": {
+    "fill": "#eef0e2",
+    "fillOpacity": 0.85,
+    "label": {
+      "color": "#1a1a1a",
+      "font": "sans",
+      "haloColor": "#ffffff",
+      "haloWidth": 2,
+      "letterSpacing": 0,
+      "size": 13,
+      "uppercase": false
+    },
+    "pointColor": "#3a3f36",
+    "pointRadius": 5,
+    "stroke": "#8a8f7a",
+    "strokeWidth": 1
+  },
+  "fonts": {
+    "decorative": "Cinzel",
+    "sans": "Inter"
+  },
+  "id": "atlas",
+  "name": "Atlas",
+  "schemaVersion": 1
+}

@@ -1,0 +1,27 @@
+{
+  "features": [
+    {
+      "geometry": {
+        "coordinates": [
+          1,
+          -1.5
+        ],
+        "type": "Point"
+      },
+      "properties": {
+        "id": "sample-highlands-label",
+        "rank": 3,
+        "rotation": 0,
+        "status": "canon",
+        "summary": "A placeholder free-standing label for an unmapped area — no region polygon drawn yet.",
+        "tags": [
+          "sample"
+        ],
+        "text": "Sample Highlands",
+        "type": "label"
+      },
+      "type": "Feature"
+    }
+  ],
+  "type": "FeatureCollection"
+}

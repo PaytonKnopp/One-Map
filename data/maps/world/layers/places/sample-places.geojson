@@ -1,0 +1,80 @@
+{
+  "features": [
+    {
+      "geometry": {
+        "coordinates": [
+          1.5,
+          0.3
+        ],
+        "type": "Point"
+      },
+      "properties": {
+        "icon": "city",
+        "id": "sampleton",
+        "name": "Sampleton",
+        "rank": 1,
+        "relations": [
+          {
+            "target": "sample-country",
+            "type": "capital-of"
+          }
+        ],
+        "status": "canon",
+        "subtype": "city",
+        "summary": "A placeholder capital city demonstrating place rendering. Replace or delete freely.",
+        "tags": [
+          "sample"
+        ],
+        "type": "place"
+      },
+      "type": "Feature"
+    },
+    {
+      "geometry": {
+        "coordinates": [
+          4,
+          0
+        ],
+        "type": "Point"
+      },
+      "properties": {
+        "icon": "port",
+        "id": "sample-port",
+        "name": "Sample Port",
+        "rank": 2,
+        "status": "canon",
+        "subtype": "port",
+        "summary": "A placeholder port town where Sample River meets Sample Sea.",
+        "tags": [
+          "sample"
+        ],
+        "type": "place"
+      },
+      "type": "Feature"
+    },
+    {
+      "geometry": {
+        "coordinates": [
+          0.5,
+          -1
+        ],
+        "type": "Point"
+      },
+      "properties": {
+        "icon": "village",
+        "id": "sample-village",
+        "name": "Little Sample",
+        "rank": 4,
+        "status": "canon",
+        "subtype": "village",
+        "summary": "A placeholder minor village, visible only at closer zoom.",
+        "tags": [
+          "sample"
+        ],
+        "type": "place"
+      },
+      "type": "Feature"
+    }
+  ],
+  "type": "FeatureCollection"
+}

@@ -1,0 +1,65 @@
+{
+  "bounds": [
+    [
+      -179,
+      -84
+    ],
+    [
+      179,
+      84
+    ]
+  ],
+  "defaultView": {
+    "center": [
+      4,
+      0
+    ],
+    "zoom": 6
+  },
+  "id": "world",
+  "layers": [
+    {
+      "defaultVisible": true,
+      "id": "regions",
+      "name": "Regions",
+      "types": [
+        "region"
+      ],
+      "zIndex": 0
+    },
+    {
+      "defaultVisible": true,
+      "id": "routes",
+      "name": "Routes",
+      "types": [
+        "route"
+      ],
+      "zIndex": 1
+    },
+    {
+      "defaultVisible": true,
+      "id": "labels",
+      "name": "Free labels",
+      "types": [
+        "label"
+      ],
+      "zIndex": 2
+    },
+    {
+      "defaultVisible": true,
+      "id": "places",
+      "name": "Places",
+      "types": [
+        "place"
+      ],
+      "zIndex": 3
+    }
+  ],
+  "maxZoom": 20,
+  "minZoom": 0,
+  "name": "One World",
+  "planeMetersPerUnit": 1000,
+  "schemaVersion": 1,
+  "theme": "atlas",
+  "unit": "world-km"
+}
