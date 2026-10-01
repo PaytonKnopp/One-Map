@@ -1,0 +1,38 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+*.tsbuildinfo
+
+# Private, never-published content (see CLAUDE.md)
+private/
+
+# Local backups created by `npm run export`
+backups/
+
+# Generated stress-test worlds (see docs/SCALING.md); never commit these
+.stress/
+
+# Env / secrets
+.env
+.env.*
+!.env.example
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/*
+!.vscode/extensions.json
+.idea/
+
+# Logs
+*.log
+npm-debug.log*
+
+# Test / coverage output
+coverage/
+playwright-report/
+test-results/

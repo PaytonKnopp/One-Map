@@ -1,0 +1,17 @@
+dist/
+node_modules/
+coverage/
+private/
+backups/
+.stress/
+
+# Canonical formatting for these is owned by `npm run format:data`
+# (stable key order, rounded coordinates) — Prettier must not fight it.
+data/**/*.json
+data/**/*.geojson
+
+# Lore prose must never be auto-reflowed.
+lore/**/*.md
+
+# Fixtures are deliberately raw/unformatted input for formatter tests.
+tests/fixtures/**
