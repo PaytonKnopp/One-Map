@@ -1,0 +1,32 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm run validate)",
+      "Bash(npm run validate -- *)",
+      "Bash(npm run find -- *)",
+      "Bash(npm run show -- *)",
+      "Bash(npm run where -- *)",
+      "Bash(npm run offset -- *)",
+      "Bash(npm run measure -- *)",
+      "Bash(npm run format:data)",
+      "Bash(npm run format:check)",
+      "Bash(npm run snapshot -- *)",
+      "Bash(npm run test)",
+      "Bash(npm run test -- *)",
+      "Bash(npm run typecheck)",
+      "Bash(npm run lint)",
+      "Bash(npm run build)"
+    ],
+    "deny": [
+      "Bash(git push --force*)",
+      "Bash(git push -f*)",
+      "Bash(git reset --hard*)",
+      "Bash(git clean*)",
+      "Bash(git checkout -- *)",
+      "Bash(git branch -D*)",
+      "Bash(git rebase*)",
+      "Bash(git commit --amend*)",
+      "Bash(npm run clear-sample -- --yes*)"
+    ]
+  }
+}
