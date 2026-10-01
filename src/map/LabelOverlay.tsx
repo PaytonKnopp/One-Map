@@ -4,14 +4,20 @@ import type { Map as MapLibreMap } from 'maplibre-gl';
 import { ringCentroid } from '../core/geometry.ts';
 import type { SpatialFeature } from '../core/schema/entity.ts';
 import type { Theme } from '../core/schema/theme.ts';
+import { world } from './data.ts';
 import { resolveLabelStyle, resolveFeatureStyle } from './style.ts';
+import { isCurrentAtYear } from './timeline.ts';
 import { useMapCamera } from './useMapCamera.ts';
+
+const GHOST_LABEL_OPACITY = 0.35;
 
 interface LabelOverlayProps {
   map: MapLibreMap | null;
   features: SpatialFeature[];
   theme: Theme;
   mapMinZoom: number;
+  viewedYear?: number | undefined;
+  ghost?: boolean | undefined;
 }
 
 interface Box {
@@ -68,8 +74,16 @@ const FONT_FAMILY_FALLBACK: Record<'decorative' | 'sans', string> = {
  * symbol layers). Straight text for points and region centroids; curved
  * `<textPath>` text for routes and line-geometry free labels.
  */
-export function LabelOverlay({ map, features, theme, mapMinZoom }: LabelOverlayProps) {
+export function LabelOverlay({
+  map,
+  features,
+  theme,
+  mapMinZoom,
+  viewedYear,
+  ghost = false,
+}: LabelOverlayProps) {
   useMapCamera(map); // re-render on every camera change
+  const effectiveViewedYear = viewedYear ?? world.calendar.currentYear;
 
   const fonts = {
     decorative: theme.fonts.decorative
@@ -86,8 +100,8 @@ export function LabelOverlay({ map, features, theme, mapMinZoom }: LabelOverlayP
     if (!map) return [];
 
     type Entry =
-      | { kind: 'point'; feature: SpatialFeature; x: number; y: number }
-      | { kind: 'path'; feature: SpatialFeature; d: string; length: number };
+      | { kind: 'point'; feature: SpatialFeature; x: number; y: number; opacity: number }
+      | { kind: 'path'; feature: SpatialFeature; d: string; length: number; opacity: number };
 
     const candidates: Entry[] = [];
 
@@ -97,11 +111,15 @@ export function LabelOverlay({ map, features, theme, mapMinZoom }: LabelOverlayP
       const style = resolveFeatureStyle(feature, theme, mapMinZoom);
       if (zoom < style.minZoom) continue;
 
+      const isCurrent = isCurrentAtYear(feature, effectiveViewedYear, world.calendar);
+      if (!isCurrent && !ghost) continue;
+      const opacity = isCurrent ? 1 : GHOST_LABEL_OPACITY;
+
       const geometry = feature.geometry;
       if (geometry.type === 'Point') {
         const [lng, lat] = geometry.coordinates;
         const { x, y } = map.project([lng, lat]);
-        candidates.push({ kind: 'point', feature, x, y });
+        candidates.push({ kind: 'point', feature, x, y, opacity });
       } else if (geometry.type === 'LineString') {
         const projected = geometry.coordinates.map((c) => map.project(c));
         const d = projected.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ');
@@ -112,13 +130,13 @@ export function LabelOverlay({ map, features, theme, mapMinZoom }: LabelOverlayP
             projected[i]!.y - projected[i - 1]!.y,
           );
         }
-        candidates.push({ kind: 'path', feature, d, length });
+        candidates.push({ kind: 'path', feature, d, length, opacity });
       } else {
         const ring = outerRingOf(geometry);
         if (!ring) continue;
         const centroid = ringCentroid(ring);
         const { x, y } = map.project([centroid.lng, centroid.lat]);
-        candidates.push({ kind: 'point', feature, x, y });
+        candidates.push({ kind: 'point', feature, x, y, opacity });
       }
     }
 
@@ -155,7 +173,7 @@ export function LabelOverlay({ map, features, theme, mapMinZoom }: LabelOverlayP
     }
 
     return placed;
-  }, [map, features, theme, mapMinZoom, zoom]);
+  }, [map, features, theme, mapMinZoom, zoom, effectiveViewedYear, ghost]);
 
   if (!map) return null;
 
@@ -184,6 +202,7 @@ export function LabelOverlay({ map, features, theme, mapMinZoom }: LabelOverlayP
           strokeWidth: style.haloWidth * 2,
           strokeLinejoin: 'round',
           textTransform: style.uppercase ? 'uppercase' : undefined,
+          opacity: entry.opacity,
         };
 
         if (entry.kind === 'point') {

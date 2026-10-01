@@ -8,15 +8,21 @@ import {
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { useEffect, useRef, useState } from 'react';
 
+import { toSortKey } from '../core/calendar.ts';
 import { ringCentroid } from '../core/geometry.ts';
 import type { SpatialFeature } from '../core/schema/entity.ts';
 import type { MapConfig } from '../core/schema/map.ts';
 import type { Theme } from '../core/schema/theme.ts';
 import { CoordinateReadout } from './CoordinateReadout.tsx';
+import { world } from './data.ts';
 import { ensureIconImage, iconImageId } from './icons.ts';
 import { LabelOverlay } from './LabelOverlay.tsx';
+import { MeasureTool } from './MeasureTool.tsx';
 import { ScaleBar } from './ScaleBar.tsx';
 import { resolveFeatureStyle } from './style.ts';
+import { featureTimelineKeys } from './timeline.ts';
+
+const GHOST_OPACITY_FACTOR = 0.25;
 
 // MapLibre's own relative-URL worker lookup breaks once Vite bundles its
 // entry into our single chunk, and a plain `?url` import of the worker
@@ -32,6 +38,12 @@ interface MapViewProps {
   /** The entity whose info panel is open (brief §8) — the map flies to it if it has geometry. */
   selectedEntityId?: string | undefined;
   onSelectEntity?: ((id: string) => void) | undefined;
+  /** The timeline's current year (brief §4.3); defaults to the world's `currentYear`. */
+  viewedYear?: number | undefined;
+  /** Show out-of-range entities faded instead of hiding them. */
+  ghost?: boolean | undefined;
+  /** Measure tool (brief §8): click two points to see the planar distance between them. */
+  measureActive?: boolean | undefined;
 }
 
 const SOURCE_PREFIX = 'layer:';
@@ -46,6 +58,7 @@ function buildStyledCollection(
     type: 'FeatureCollection',
     features: features.map((feature) => {
       const style = resolveFeatureStyle(feature, theme, mapMinZoom);
+      const timeline = featureTimelineKeys(feature, world.calendar);
       return {
         type: 'Feature',
         id: feature.properties.id,
@@ -61,45 +74,82 @@ function buildStyledCollection(
           _pointRadius: style.pointRadius,
           _iconImage: iconImageId(style.iconId, style.pointColor),
           _minZoom: style.minZoom,
+          _fromKey: timeline.from,
+          _toKey: timeline.to,
         },
       };
     }),
   };
 }
 
-function addRegionLayers(map: MapLibreGLMap, sourceId: string): void {
+const ZOOM_FILTER = ['>=', ['zoom'], ['get', '_minZoom']];
+const IS_CURRENT = (viewedYearKey: number) => [
+  'all',
+  ['<=', ['get', '_fromKey'], viewedYearKey],
+  ['>=', ['get', '_toKey'], viewedYearKey],
+];
+
+/** Hide out-of-timeline-range features when not ghosting; zoom-only filter when ghosting (opacity carries the "not current now" signal instead — brief §4.3). */
+function timelineFilter(viewedYearKey: number, ghost: boolean) {
+  return ghost ? ZOOM_FILTER : ['all', ZOOM_FILTER, IS_CURRENT(viewedYearKey)];
+}
+
+/** `baseOpacityExpr` dimmed by GHOST_OPACITY_FACTOR for out-of-range features when ghosting; unchanged otherwise. */
+function timelineOpacity(baseOpacityExpr: unknown, viewedYearKey: number, ghost: boolean): unknown {
+  if (!ghost) return baseOpacityExpr;
+  return [
+    'case',
+    IS_CURRENT(viewedYearKey),
+    baseOpacityExpr,
+    ['*', baseOpacityExpr, GHOST_OPACITY_FACTOR],
+  ];
+}
+
+function addRegionLayers(
+  map: MapLibreGLMap,
+  sourceId: string,
+  viewedYearKey: number,
+  ghost: boolean,
+): void {
   map.addLayer({
     id: `${sourceId}:fill`,
     type: 'fill',
     source: sourceId,
-    filter: ['>=', ['zoom'], ['get', '_minZoom']],
+    filter: timelineFilter(viewedYearKey, ghost) as never,
     paint: {
       'fill-color': ['get', '_fill'],
-      'fill-opacity': ['get', '_fillOpacity'],
+      'fill-opacity': timelineOpacity(['get', '_fillOpacity'], viewedYearKey, ghost) as never,
     },
   });
   map.addLayer({
     id: `${sourceId}:line`,
     type: 'line',
     source: sourceId,
-    filter: ['>=', ['zoom'], ['get', '_minZoom']],
+    filter: timelineFilter(viewedYearKey, ghost) as never,
     paint: {
       'line-color': ['get', '_stroke'],
       'line-width': ['get', '_strokeWidth'],
+      'line-opacity': timelineOpacity(1, viewedYearKey, ghost) as never,
     },
   });
 }
 
-function addRouteLayer(map: MapLibreGLMap, sourceId: string): void {
+function addRouteLayer(
+  map: MapLibreGLMap,
+  sourceId: string,
+  viewedYearKey: number,
+  ghost: boolean,
+): void {
   map.addLayer({
     id: `${sourceId}:line`,
     type: 'line',
     source: sourceId,
-    filter: ['>=', ['zoom'], ['get', '_minZoom']],
+    filter: timelineFilter(viewedYearKey, ghost) as never,
     layout: { 'line-cap': 'round', 'line-join': 'round' },
     paint: {
       'line-color': ['get', '_stroke'],
       'line-width': ['get', '_strokeWidth'],
+      'line-opacity': timelineOpacity(1, viewedYearKey, ghost) as never,
       // MapLibre's line-dasharray can't be a data expression — per-feature
       // dash patterns would need splitting routes into per-dash-style
       // layers. Deferred until a real route actually needs it (YAGNI).
@@ -107,19 +157,64 @@ function addRouteLayer(map: MapLibreGLMap, sourceId: string): void {
   });
 }
 
-function addPlaceLayer(map: MapLibreGLMap, sourceId: string): void {
+function addPlaceLayer(
+  map: MapLibreGLMap,
+  sourceId: string,
+  viewedYearKey: number,
+  ghost: boolean,
+): void {
   map.addLayer({
     id: `${sourceId}:icon`,
     type: 'symbol',
     source: sourceId,
-    filter: ['>=', ['zoom'], ['get', '_minZoom']],
+    filter: timelineFilter(viewedYearKey, ghost) as never,
     layout: {
       'icon-image': ['get', '_iconImage'],
       'icon-size': 0.5,
       'icon-allow-overlap': false,
       'icon-anchor': 'center',
     },
+    paint: {
+      'icon-opacity': timelineOpacity(1, viewedYearKey, ghost) as never,
+    },
   });
+}
+
+/** Re-applies filter/opacity on every already-added layer when the timeline year or ghost toggle changes, without rebuilding sources. */
+function updateTimelineStyling(
+  map: MapLibreGLMap,
+  mapConfig: MapConfig,
+  viewedYearKey: number,
+  ghost: boolean,
+): void {
+  for (const layer of mapConfig.layers) {
+    const sourceId = `${SOURCE_PREFIX}${layer.id}`;
+    for (const suffix of [':fill', ':line', ':icon'] as const) {
+      const layerId = `${sourceId}${suffix}`;
+      const glLayer = map.getLayer(layerId);
+      if (!glLayer) continue;
+      map.setFilter(layerId, timelineFilter(viewedYearKey, ghost) as never);
+      if (glLayer.type === 'fill') {
+        map.setPaintProperty(
+          layerId,
+          'fill-opacity',
+          timelineOpacity(['get', '_fillOpacity'], viewedYearKey, ghost) as never,
+        );
+      } else if (glLayer.type === 'line') {
+        map.setPaintProperty(
+          layerId,
+          'line-opacity',
+          timelineOpacity(1, viewedYearKey, ghost) as never,
+        );
+      } else if (glLayer.type === 'symbol') {
+        map.setPaintProperty(
+          layerId,
+          'icon-opacity',
+          timelineOpacity(1, viewedYearKey, ghost) as never,
+        );
+      }
+    }
+  }
 }
 
 /**
@@ -133,10 +228,15 @@ export function MapView({
   featuresByLayer,
   selectedEntityId,
   onSelectEntity,
+  viewedYear,
+  ghost = false,
+  measureActive = false,
 }: MapViewProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<MapLibreGLMap | null>(null);
   const [mapInstance, setMapInstance] = useState<MapLibreGLMap | null>(null);
+  const viewedYearKey = toSortKey({ y: viewedYear ?? world.calendar.currentYear }, world.calendar);
+
   // A ref, not a dependency, so picking a new onSelectEntity identity each
   // render doesn't force the whole map (sources, layers, icon loading) to
   // be rebuilt — only the click handler itself needs the latest callback.
@@ -144,6 +244,16 @@ export function MapView({
   useEffect(() => {
     onSelectEntityRef.current = onSelectEntity;
   }, [onSelectEntity]);
+
+  // Likewise a ref for the timeline state used at layer-CREATION time only,
+  // so the very first paint already matches without a flash — ongoing
+  // changes go through the imperative update effect below instead of a
+  // full source/layer rebuild (see that effect's comment). Declared before
+  // the mount effect so it's already current when that effect first runs.
+  const initialTimelineRef = useRef({ viewedYearKey, ghost });
+  useEffect(() => {
+    initialTimelineRef.current = { viewedYearKey, ghost };
+  }, [viewedYearKey, ghost]);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -210,9 +320,10 @@ export function MapView({
           map.addSource(sourceId, { type: 'geojson', data: collection });
 
           const types = new Set(features.map((f) => f.properties.type));
-          if (types.has('region')) addRegionLayers(map, sourceId);
-          if (types.has('route')) addRouteLayer(map, sourceId);
-          if (types.has('place')) addPlaceLayer(map, sourceId);
+          const { viewedYearKey: initialYearKey, ghost: initialGhost } = initialTimelineRef.current;
+          if (types.has('region')) addRegionLayers(map, sourceId, initialYearKey, initialGhost);
+          if (types.has('route')) addRouteLayer(map, sourceId, initialYearKey, initialGhost);
+          if (types.has('place')) addPlaceLayer(map, sourceId, initialYearKey, initialGhost);
           // `label`-type features have no map-layer geometry rendering of
           // their own beyond the text the LabelOverlay already draws.
 
@@ -229,6 +340,28 @@ export function MapView({
           map.on('mouseleave', `${sourceId}:icon`, () => (map.getCanvas().style.cursor = ''));
         }
 
+        // Raster art-layer hook (brief §9) — a no-op today since no map
+        // declares any, but a real image would just render underneath
+        // the vector layers above once one is added.
+        for (const artLayer of mapConfig.artLayers ?? []) {
+          const sourceId = `art:${artLayer.id}`;
+          map.addSource(sourceId, {
+            type: 'image',
+            url: `${import.meta.env.BASE_URL}${artLayer.src}`,
+            coordinates: artLayer.bounds,
+          });
+          map.addLayer(
+            {
+              id: sourceId,
+              type: 'raster',
+              source: sourceId,
+              paint: { 'raster-opacity': artLayer.opacity },
+              layout: { visibility: artLayer.defaultVisible ? 'visible' : 'none' },
+            },
+            map.getStyle().layers?.[1]?.id, // just above the background, under every vector layer
+          );
+        }
+
         if (!cancelled) setMapInstance(map);
       })();
     });
@@ -242,6 +375,14 @@ export function MapView({
     // Rebuilt from scratch on theme/map/data identity changes — M2 has no
     // live-editing path yet, so this trades incremental updates for simplicity.
   }, [mapConfig, theme, featuresByLayer]);
+
+  // Timeline/ghost changes are frequent (slider dragging) and must stay
+  // smooth, so these update the already-created layers in place rather
+  // than going through the full rebuild effect above.
+  useEffect(() => {
+    if (!mapInstance) return;
+    updateTimelineStyling(mapInstance, mapConfig, viewedYearKey, ghost);
+  }, [mapInstance, mapConfig, viewedYearKey, ghost]);
 
   const allFeatures = Array.from(featuresByLayer.values()).flat();
 
@@ -278,6 +419,8 @@ export function MapView({
         features={allFeatures}
         theme={theme}
         mapMinZoom={mapConfig.minZoom ?? 0}
+        viewedYear={viewedYear}
+        ghost={ghost}
       />
       <ScaleBar
         map={mapInstance}
@@ -286,6 +429,12 @@ export function MapView({
       />
       <CoordinateReadout
         map={mapInstance}
+        unit={mapConfig.unit}
+        planeMetersPerUnit={mapConfig.planeMetersPerUnit}
+      />
+      <MeasureTool
+        map={mapInstance}
+        active={measureActive}
         unit={mapConfig.unit}
         planeMetersPerUnit={mapConfig.planeMetersPerUnit}
       />
