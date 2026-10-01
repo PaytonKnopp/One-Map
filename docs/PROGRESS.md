@@ -180,8 +180,7 @@ About showing correct live-computed stats.
       `scripts/lib/entities.ts`, the Node-side (fs-based) mirror of
       `src/content/entities.ts`
 - [x] `scripts/lib/shapes.ts` (seeded-deterministic circle/rectangle/
-      blob/meandering-route generation, reusing `src/core/geometry.ts`)
-      + `scripts/shape.ts` CLI wrapper
+      blob/meandering-route generation, reusing `src/core/geometry.ts`) + `scripts/shape.ts` CLI wrapper
 - [x] Mutation scripts: `add`, `move` (point or offset-preserving-shape),
       `delete` (dangling-reference report), `rename-id` (updates every
       relation/wiki-link/`parentEntity` reference atomically, renames
@@ -238,12 +237,44 @@ timeline range).
 
 ## M6 — Hardening
 
-- [ ] Accessibility pass
-- [ ] Mobile pass
-- [ ] Stress test with a generated (uncommitted) ~20k-feature world —
-      report results here
-- [ ] Final docs pass; final `CLAUDE.md` pass
-- [ ] CI fully green; final report to Payton
+- [x] Accessibility pass: a new shared `src/ui/usePanelDismiss.ts` hook
+      (focus the close button on open, close on Escape from anywhere)
+      is now used by all four side panels — previously only InfoPanel
+      had this; BrowseView/ChroniclePage/AboutPage were missing it
+      entirely. `SearchBox` now also clears on Escape. Verified live in
+      a real browser (Playwright): Tab order, focus-on-open, and
+      Escape-to-close all confirmed working on every panel. Known,
+      accepted gap: the measure tool and map-entity selection are
+      mouse/touch-only, with no keyboard equivalent — flagged below
+      rather than built, since a keyboard-driven point-picker on the
+      map canvas is a real feature, not a quick fix.
+- [x] Mobile pass (390×844 viewport, Playwright): toolbar wraps
+      cleanly, Browse's filters wrap and its list is fully readable,
+      the timeline bar and scale bar fit without clipping. **One real
+      bug found and fixed**: every side panel (InfoPanel, BrowseView,
+      ChroniclePage, AboutPage) had no explicit `zIndex`, while the
+      toolbar/breadcrumb row use `zIndex: 1` — on a narrow viewport the
+      toolbar wraps tall enough to visually sit on top of a panel's own
+      close button and heading, hiding both. Fixed by giving all four
+      panels `zIndex: 2`. Re-verified by screenshot after the fix.
+- [x] Stress test with a generated (uncommitted, built-and-deleted
+      scratch copy) ~20k-feature world — full results and concrete
+      numbers in `docs/SCALING.md`'s new "M6 stress test" section.
+      Headline: fine at the current/realistic scale, but confirms two
+      real, independent scaling limits for the future: (1) the JS
+      bundle balloons to ~10 MB / ~890 KB gzip and takes ~10s to reach
+      `map.on('idle')` at 20k features — exactly the trigger for the
+      already-planned PMTiles migration in `docs/SCALING.md`; (2) the
+      DOM/SVG label overlay has no label-collision decluttering, which
+      would show up in any dense cluster well before 20k features,
+      independent of total world size.
+- [x] Final docs pass: `CLAUDE.md`, `README.md`, `docs/SCALING.md`,
+      this file.
+- [x] CI fully green: `typecheck`/`lint`/`format:check`/`test`/
+      `validate`/`build` all pass locally (the same commands
+      `.github/workflows/ci.yml` runs); no workflow changes were needed
+      for M5/M6 — the helper/dev scripts are deliberately not part of
+      CI (they're interactive/manual tools, not build-gating checks).
 
 ## Open questions (non-blocking)
 
@@ -256,10 +287,11 @@ timeline range).
 - Theme colors for `atlas` and `parchment` (both built, reasonable
   defaults) — Payton can restyle anytime via `data/themes/*.json`, no
   code change needed.
-- The JS bundle is ~1.6 MB (~455 KB gzip), mostly MapLibre GL JS +
-  react-markdown/remark/rehype — normal for what this app does, but
-  flagged for the M6 performance check; dynamic `import()`
-  code-splitting is the lever if it ever needs to come down.
+- The JS bundle is ~1.6 MB (~455 KB gzip) at the current sample-world
+  scale — normal for what this app does (mostly MapLibre GL JS +
+  react-markdown/remark/rehype). See `docs/SCALING.md`'s M6 stress-test
+  section for what this looks like at 20,000 features, and the two
+  concrete triggers for when to act on it.
 - `properties.style` (per-entity style override) is defined in the
   schema (`docs/DATA_MODEL.md`) but not yet read by the viewer — theme
   `byType`/`bySubtype` resolution covers every subtype so far; wiring in
@@ -283,3 +315,22 @@ timeline range).
 - `data/world.json`'s `scale.travelSpeeds` is still unset, so the
   measure tool never shows a travel-time estimate — cosmetic until
   Payton defines at least one speed (e.g. walking/horse/ship).
+- Selecting a map entity and the measure tool are both mouse/touch-only
+  — no keyboard equivalent for clicking a feature or dropping a measure
+  point (MapLibre's own canvas does support keyboard pan/zoom when
+  focused, which is unrelated and already works). A real fix is a
+  keyboard-driven point-picker, which is a feature in its own right,
+  not a quick accessibility patch — noted during the M6 accessibility
+  pass rather than built then.
+- The label overlay (`src/map/LabelOverlay.tsx`) has no label-collision
+  decluttering — confirmed by the M6 stress test (`docs/SCALING.md`)
+  to overlap in any sufficiently dense cluster, independent of total
+  world size. Worth a basic "skip if overlapping an already-placed
+  label" pass once it's actually noticed in real use.
+- The documented draft/retired visibility rule (`CLAUDE.md`'s "Status
+  and visibility": draft hidden from the production build by default,
+  retired shown only via a toggle) isn't actually enforced anywhere
+  outside `BrowseView`'s own local checkboxes — the map and search both
+  show every status unconditionally today, and there's no
+  `import.meta.env.PROD` check anywhere. Worth closing this gap (or
+  relaxing the documented rule to match reality) before it's relied on.

@@ -1,7 +1,7 @@
 # CLAUDE.md
 
 This is a lifelong, ever-expanding fictional-world map. Payton builds one
-world over his whole life as a zoomable map with names, icons, regions,
+world over their whole life as a zoomable map with names, icons, regions,
 routes, lore, and history. **"One World" is a placeholder project name** —
 the world's real name lives in exactly one place, `data/world.json` →
 `name`, and nowhere else. Never hard-code it in UI, page titles, READMEs,
@@ -118,11 +118,16 @@ frontmatter. Details and examples: `docs/DATA_MODEL.md`.
 
 ## Status and visibility
 
-`status` is `canon` (default), `draft`, or `retired`. `draft` is hidden
-from the production build by default; `retired` is shown only via a
-viewer toggle. **Both are still fully public in the Git history** — status
-controls viewer visibility, not repo visibility. Don't use `draft`/
-`retired` as a substitute for the `private/` folder below.
+`status` is `canon` (default), `draft`, or `retired`. The intent (not
+yet fully wired up — see `docs/PROGRESS.md`'s open questions): `draft`
+hidden from the production build by default, `retired` shown only via
+a viewer toggle. Today, `BrowseView` has local checkboxes for both, but
+the map and search show every status unconditionally — check
+`docs/PROGRESS.md` before assuming either is actually filtered anywhere
+else. **Both are still fully public in the Git history regardless** —
+status is meant to control viewer visibility, not repo visibility.
+Don't use `draft`/`retired` as a substitute for the `private/` folder
+below.
 
 ## Public repo
 
@@ -194,7 +199,7 @@ private/                     gitignored — never published
 - **Naming**: entity `name` is display text (can change anytime); `id` is
   permanent kebab-case. Tags are lowercase kebab-case, free-form, reused
   consistently (check `find`/existing data before inventing a new tag
-  that duplicates one that already exists, once that tooling lands).
+  that duplicates one that already exists).
 - **Rank** (spatial entities, 1–5): controls the zoom level a label/icon
   appears at — 1 is most prominent (always visible, e.g. a capital or a
   sea), 5 is least (a minor camp, only visible fully zoomed in).

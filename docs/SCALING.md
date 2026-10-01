@@ -47,3 +47,61 @@ GeoJSON source files either way.
 This step is explicitly **out of scope to build now** (brief §8) — revisit
 this document and implement it only once real content growth actually
 needs it.
+
+## M6 stress test: concrete numbers at 20,000 features
+
+Per the brief's hardening checklist, a synthetic ~20,000-feature world
+was generated in a throwaway scratch copy of the repo (never committed —
+built, measured, and deleted; `data/maps/world`'s real content was
+untouched throughout) and measured with a headless Playwright browser.
+20,000 `place` features (a realistic rank distribution: 2% rank 1, 8%
+rank 2, 20% rank 3, 35% rank 4, 35% rank 5 — not a uniform 1–5 spread,
+which would make an unrealistic ~20% of the world "always visible")
+across 20 `.geojson` files on the `world` map, all other content
+untouched:
+
+- **Production JS bundle**: 1.6 MB → **9.97 MB** (455 KB → **889 KB
+  gzip**). The current architecture bundles every map's GeoJSON
+  straight into the app's JS (via Vite's module loading) rather than
+  fetching it at runtime — this is exactly the scaling limit the plan
+  above anticipates, now with a real number attached.
+- **Time to `map.on('idle')`** (every source loaded, first paint done):
+  **~10 seconds** from page load, on localhost with no network
+  latency — would be meaningfully worse over a real connection, since
+  it's downstream of fetching/parsing that ~9 MB bundle at all. At the
+  current sample-world scale this is well under 1 second.
+- **Runtime pan/zoom, once loaded**: smooth, ~58–60 fps, no jank beyond
+  a single frame at the start of a programmatic pan. The cost here is
+  almost entirely in the initial load, not per-frame rendering — good
+  news for the eventual fix, since it means the GeoJTS-source rendering
+  itself isn't the bottleneck, just getting the data there (the
+  GeoJSON-source rendering, once data is in memory, is cheap).
+- **Heap memory**: ~82 MB used / 150 MB total — unremarkable.
+- **A confirmed, independent issue, not just a scale one**: the DOM/SVG
+  label overlay (`src/map/LabelOverlay.tsx`, the M2 fontnik-build-failure
+  fallback — see the M2 entry above) has **no label-collision/
+  decluttering logic**. `rank` controls how many labels are eligible to
+  show at a given zoom, but doesn't prevent the eligible ones from
+  overlapping each other on screen — confirmed visually (a stress-test
+  screenshot at zoom 2 showed heavy label overlap even with the
+  realistic rank distribution, since "only 10% of 20,000 is visible at
+  this zoom" is still ~2,000 features spread across one viewport). This
+  would start being visible at far lower feature counts than 20,000,
+  in any sufficiently dense cluster (a crowded city map, say) — it's
+  not purely a large-world problem.
+
+**Practical takeaway**: nothing here needs fixing today — a real
+hand-built world realistically reaches dozens to low hundreds of
+entities per map even over years, nowhere near 20,000, and the existing
+sample world's handful of features is nowhere near a problem. Two
+concrete, independent signals for when action is actually warranted:
+
+1. **A single map's feature count approaches ~1,000–2,000**: follow
+   the PMTiles path above (step 2) — convert that map's layers to
+   vector tiles at build time instead of bundling GeoJSON into the JS.
+2. **Any view (dense or not) shows overlapping labels**: that's the
+   label-overlay decluttering gap, independent of total world size —
+   worth a basic "skip a label if its screen-space bounding box
+   collides with one already placed this frame" pass in
+   `LabelOverlay.tsx` whenever it's first actually noticed in real use,
+   rather than pre-building it unneeded.
