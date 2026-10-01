@@ -407,3 +407,97 @@ sepia background, ink-brown strokes, muted sea green). Deferred to
 `docs/ROADMAP.md` rather than built now; the `TypeStyle` schema has no
 pattern field yet either, so adding one later is additive, not a
 migration.
+
+## 2026-10-01 — M5 scripts: Node's native JSON-import attribute vs. `readJson`
+
+Node's native ESM loader requires `import x from './y.json' with { type:
+'json' }` for a direct JSON import; Vite doesn't need (or want) that
+attribute. Rather than branch on runtime, every Node script reads JSON
+via the existing `readJson()` helper (`readFileSync` + `JSON.parse`,
+`scripts/lib/load-data.ts`) and never uses a native JSON import — one
+convention across all scripts, and it matches what `scripts/validate.ts`
+already did since M1. `scripts/lib/entities.ts` (the Node-side mirror of
+`src/content/entities.ts`, built for M5's read/write scripts) hit this
+directly: an initial `import worldJson from '../../data/world.json'`
+threw `ERR_IMPORT_ATTRIBUTE_MISSING` the first time any script actually
+ran under plain `node`.
+
+## 2026-10-01 — `where`/`measure` must not mix coordinates across maps
+
+Each map has its own independent planar coordinate space (brief §4.4) —
+a point at `[0, 0]` on the world map and `[0, 0]` on a nested city map
+are unrelated locations. `scripts/where.ts`'s "nearest entities" and
+`scripts/measure.ts`'s distance both initially computed across every
+entity regardless of map, producing numbers that looked plausible but
+meant nothing (confirmed by testing: `sampleton-city`'s entities showed
+up as the "nearest" things to a world-map point, at a bogus distance).
+Fixed by scoping `where` to one map (`--map`, default
+`world.defaultMap`) and making `measure` refuse outright when its two
+points resolve to different maps, naming both maps in the error instead
+of silently producing a number.
+
+## 2026-10-01 — `rename-id`: write-then-delete, never `rename`, for a changed lore filename
+
+`rename-id` renames a lore file (`lore/<type>/<old-id>.md` →
+`lore/<type>/<new-id>.md`) as part of updating every reference. The
+first draft wrote the new content to the new path, then called
+`renameSync(oldPath, newPath)` to "finish the move" — but the old file
+still held the stale pre-rename content at that point, so the rename
+would have overwritten the just-written new content with it. Fixed to
+`unlinkSync(oldPath)` strictly after the new content is written, and
+never use `renameSync` for this. Also switched frontmatter
+serialization from a hand-rolled `JSON.stringify`-per-field line (valid
+but flow-style, e.g. `tags: ["sample"]`) to `js-yaml`'s `dump()`, which
+produces the same block style every other file already uses.
+
+## 2026-10-01 — `snapshot.ts`: a single shell command string, not an args array, with `shell: true`
+
+Node's `child_process.spawn` deprecation-warns (`DEP0190`) on passing
+both an argument array and `shell: true` — the array's elements aren't
+shell-escaped, which is the unsafe pattern the warning exists for, even
+though every argument here is our own literal/number, never user
+input. Fixed by building one command string
+(`` `npx vite preview --port ${PORT} --strictPort` ``) instead. Separately,
+`map.jumpTo({ center, zoom })` fails typecheck under
+`exactOptionalPropertyTypes` when `zoom` is possibly `undefined` (MapLibre's
+type wants `number`, not `number | undefined`) — fixed with a
+conditional object literal rather than a non-null assertion.
+
+## 2026-10-01 — `archiver` v8 has no callable factory export; use its `ZipArchive` class
+
+The old `archiver('zip', options)` factory-function API (what most
+examples online still show) doesn't exist in `archiver@8` — its actual
+runtime export (confirmed by reading `node_modules/archiver/index.js`)
+is a set of named classes (`Archiver`, `ZipArchive`, `TarArchive`,
+`JsonArchive`), and `@types/archiver@8` matches that: no default
+export. `scripts/export.ts` uses `new ZipArchive({ zlib: { level: 9 } })`
+instead.
+
+## 2026-10-01 — `clear-sample` defaults to a dry run, and removes whole nested sample maps
+
+Every M2–M4 sample entity (and the sample lore added in M5) is tagged
+`sample`; `scripts/clear-sample.ts` deletes exactly that set the same
+way `delete.ts` deletes anything (feature removed from its `.geojson`,
+file deleted if now empty; lore file deleted) plus a dangling-reference
+report. One addition `delete.ts` doesn't need: any map whose
+`parentEntity` is itself a sample entity (here, `sampleton-city`,
+nested under the sample place `sampleton`) is entirely sample content
+too, so its whole map folder is removed, not just left orphaned.
+Because this is a one-shot mass deletion by design (unlike `delete.ts`,
+which only mass-deletes past a 5-entity threshold), it prints exactly
+what it would remove and requires `--yes` to actually do it, rather
+than using the same numeric threshold.
+
+## 2026-10-01 — `.claude/settings.json` pre-allows read-only and idempotent scripts only
+
+Per brief §11/§16, `find`/`show`/`where`/`offset`/`measure` (read-only),
+`format:data`/`format:check` (idempotent canonical formatting),
+`validate`/`typecheck`/`lint`/`test`/`build` (checks, no data mutation),
+and `snapshot` (builds + screenshots, no data mutation) are pre-allowed
+so a future session doesn't need a permission prompt for routine,
+non-destructive work. Every script that writes or deletes content
+(`add`, `move`, `delete`, `rename-id`, `new-map`, `new-layer`,
+`new-type`, `export`, `clear-sample`) is deliberately left out — those
+still prompt, consistent with `CLAUDE.md`'s destructive-change rule —
+and force-push/`reset --hard`/`clean`/`rebase`/`commit --amend` are
+explicitly denied.

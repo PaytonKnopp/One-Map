@@ -8,13 +8,16 @@ atlas with names, icons, regions, routes, lore, and history, built up over
 years. Plain-text data in Git — GeoJSON, Markdown, JSON — no database, no
 backend, deployed as a static site on GitHub Pages.
 
-> **Status:** Milestones 1–4 (Foundation, Map core, Info layer, Depth) —
-> a real MapLibre viewer with two switchable themes, info panel, lore
-> rendering with wiki links, search, a browse view, a nested city map
-> with breadcrumbs, a timeline, a measure tool, and chronicle/about
-> pages, over a small tagged-`sample` seed world. Most of the editing
-> scripts (M5) and the hardening pass (M6) are still ahead. See
-> `docs/PROGRESS.md` for exactly what's built.
+> **Status:** Milestones 1–5 (Foundation, Map core, Info layer, Depth,
+> Tooling) — a real MapLibre viewer with two switchable themes, info
+> panel, lore rendering with wiki links, search, a browse view, a
+> nested city map with breadcrumbs, a timeline, a measure tool,
+> chronicle/about pages, the full set of editing/geometry helper
+> scripts, `.claude/commands/` slash commands, and a small tagged-
+> `sample` seed world (2 people, 2 factions, 3 events, a nested city
+> map). Only the hardening pass (M6 — accessibility, mobile, perf,
+> final docs) is still ahead. See `docs/PROGRESS.md` for exactly what's
+> built.
 
 ## How this is used
 
@@ -56,19 +59,19 @@ npm run format           # Prettier, for code (not data/lore — see .prettierig
 
 ## Adding content
 
-The full plain-language workflow (open Claude Code, describe what to
-add) needs the helper scripts from M5 to be comfortable — most of them
-don't exist yet. Today, spatial entities (places/regions/routes/free
-labels) can be hand-edited directly: add a GeoJSON Feature to a file
-under `data/maps/world/layers/<layer>/`, following the shape of the
-existing `sample-*.geojson` files and the field reference in
-`docs/DATA_MODEL.md`, then run `npm run format:data && npm run
-validate` and look at it with `npm run dev`. `data/world.json`,
-`data/registry/*.json`, `data/maps/world/map.json`, and
-`data/themes/atlas.json` are all editable the same way. See `CLAUDE.md`
-for the full editing rules (ID stability, consistency duty,
-destructive-change confirmation) even while the scripts that automate
-parts of this are still being built.
+Open [Claude Code](https://claude.com/claude-code) in this repo and
+describe what to add, edit, or delete in plain language — the slash
+commands in `.claude/commands/` (`/add-place`, `/add-region`,
+`/add-route`, `/add-lore`, `/add-event`, `/edit`, `/delete`,
+`/new-map`, `/check-world`, `/chronicle`, `/suggest`) cover the common
+requests end to end, using the helper scripts under `npm run <name>
+-- --help` (`find`, `show`, `where`, `offset`, `measure`, `shape`,
+`add`, `move`, `delete`, `rename-id`, `new-map`, `new-layer`,
+`new-type`, `snapshot`, `export`, `clear-sample`) to look things up,
+compute geometry, write canonically-formatted files, and verify the
+result with a real screenshot before calling anything done. See
+`CLAUDE.md` for the full editing rules (ID stability, field ownership,
+consistency duty, destructive-change confirmation).
 
 ## Deploying
 
@@ -81,9 +84,39 @@ no separate deploy command to run.
 
 ## Backup / restore
 
-Not built yet (M5, `npm run export`). Every change is already preserved
-in Git history regardless — `git log`/`git revert` work today for
-recovering anything.
+`npm run export` writes a timestamped JSON bundle and a `.zip` of
+`data/`, `lore/`, and original `assets/` to the gitignored `backups/`
+folder — a quick copy to keep elsewhere, not a substitute for Git
+history. Every change is already preserved in Git regardless —
+`git log`/`git revert` work today for recovering anything, and nothing
+here ever force-pushes or rewrites history.
+
+## Starting your own world
+
+Everything under the `sample` tag is placeholder seed content meant to
+be replaced. Run `npm run clear-sample` to see exactly what that
+removes, or `npm run clear-sample -- --yes` to actually clear it —
+before writing real content, see "Top things to decide first" below.
+
+## Top things to decide first
+
+Everything below works with sensible placeholders — nothing is
+blocked on these, but they're the things most worth Payton's own
+decision before (or instead of) asking Claude Code to guess:
+
+1. **The world's actual name** — `data/world.json` → `name` (currently
+   the literal placeholder `"One World"`).
+2. **Calendar names** — month names, weekday names, era labels
+   (`data/world.json` → `calendar`; currently `"Month 1"`, `"Day 1"`,
+   `"AE"`/`"BE"`).
+3. **Theme colors/fonts** — `data/themes/atlas.json` /
+   `parchment.json` are fully data-driven; restyle either (or add a
+   third) with no code change.
+4. **Content license** — `CONTENT-LICENSE.md` currently defaults to
+   all-rights-reserved for `data/`/`lore/`/original `assets/`; the code
+   itself is MIT (`LICENSE`).
+5. **Whether to keep or clear the sample world** — see "Starting your
+   own world" above.
 
 ## Troubleshooting
 

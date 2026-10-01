@@ -175,15 +175,66 @@ About showing correct live-computed stats.
 
 ## M5 — Tooling
 
-- [ ] Remaining helper scripts: `find`, `show`, `where`, `offset`,
-      `measure`, `shape`, `add`, `rename-id`, `move`, `delete`, `snapshot`
-      (Playwright), `export`, `new-map`, `new-layer`, `new-type`,
-      `clear-sample` (`icons` already done in M2)
-- [ ] Expand the M2/M3 seed data into the full brief §12 sample content
-      (2 people — have 1 — 2 factions, 3 events across different years,
-      a draft entity) — already tagged `sample`, a nested city map
-      already exists, and already structured to extend, not redo
-- [ ] `.claude/commands/*`, `.claude/settings.json`
+- [x] Read-only lookup scripts: `find`, `show`, `where` (map-scoped),
+      `offset`, `measure` (refuses cross-map pairs) — all built on a new
+      `scripts/lib/entities.ts`, the Node-side (fs-based) mirror of
+      `src/content/entities.ts`
+- [x] `scripts/lib/shapes.ts` (seeded-deterministic circle/rectangle/
+      blob/meandering-route generation, reusing `src/core/geometry.ts`)
+      + `scripts/shape.ts` CLI wrapper
+- [x] Mutation scripts: `add`, `move` (point or offset-preserving-shape),
+      `delete` (dangling-reference report), `rename-id` (updates every
+      relation/wiki-link/`parentEntity` reference atomically, renames
+      the lore file) — each tested end to end against real/throwaway
+      data and reverted
+- [x] `new-map` (cross-links `parentEntity` both ways), `new-layer`,
+      `new-type` (subtype/non-spatial/relation, auto-registers
+      reciprocals)
+- [x] `snapshot.ts` — headless Playwright screenshot of a live map view
+      (by entity id, center+zoom, or bbox); `playwright` is now a
+      permanent devDependency; `src/map/MapView.tsx` exposes
+      `window.__oneWorldMap` for it to drive
+- [x] `export.ts` — timestamped JSON bundle + real `.zip`
+      (`archiver`'s `ZipArchive` class) of `data/`/`lore/`/`assets/`
+      into the gitignored `backups/`
+- [x] `clear-sample.ts` — dry-run by default; `--yes` deletes every
+      `sample`-tagged entity and any nested map entirely under one
+      (`sampleton-city`), with the same dangling-reference report as
+      `delete.ts`
+- [x] Expanded sample content: a second person (`mira-sample`), two
+      factions (`sample-league` canon, `sample-raiders` **draft** —
+      doubling as the one draft-status entity), three events across
+      different years (`founding-of-sampleton` 850 AE,
+      `battle-of-sample-river` 995 AE, `sample-accord` 1000 AE) — all
+      tagged `sample`, cross-linked by relations/wiki-links, verified
+      live (screenshots + `npm run show`) including the timeline range
+      correctly extending back to 850 AE
+- [x] `.claude/commands/` (11 slash commands: `/add-place`,
+      `/add-region`, `/add-route`, `/add-lore`, `/add-event`, `/edit`,
+      `/delete`, `/new-map`, `/check-world`, `/chronicle`, `/suggest`)
+      and `.claude/settings.json` (pre-allows the read-only/idempotent
+      scripts; denies force-push/`reset --hard`/`clean`/`rebase`/
+      `commit --amend`)
+
+**Real bugs found and fixed while building this** (all documented in
+`docs/DECISIONS.md`): Node's native ESM loader needs a JSON import
+attribute Vite doesn't (fixed via the existing `readJson` helper
+everywhere); `where`/`measure` originally mixed coordinates across
+independent map coordinate spaces; `rename-id`'s file-rename order
+would have clobbered newly-written content (fixed to delete-after-
+write, never `renameSync`); `snapshot.ts`'s `spawn` call triggered
+Node's `DEP0190` deprecation warning (fixed to a single command
+string); `archiver@8` has no callable factory export, only named
+classes (fixed to `new ZipArchive(...)`).
+
+**Verification:** `npm run typecheck`/`lint`/`test`/`format:check`/
+`validate`/`build` all pass. Every mutation script was exercised
+against real or throwaway data (a scratch copy with a symlinked
+`node_modules`, for the one genuinely destructive `clear-sample --yes`
+run) and reverted/cleaned up, confirmed via `git status --short`
+afterward. `npm run snapshot` used repeatedly to visually confirm new
+sample content renders correctly (info panel, relations, wiki links,
+timeline range).
 
 ## M6 — Hardening
 

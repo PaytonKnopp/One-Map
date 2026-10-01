@@ -14,32 +14,35 @@ No database, no backend. Everything the site needs is in this repo or
 generated at build time. The repo is **public** — see "Public repo" below.
 
 > **Build status:** as of 2026-10-01 this project has completed
-> Milestones 1–4 (Foundation, Map core, Info layer, Depth) of the plan in
-> the original build brief. A real map viewer exists (MapLibre, two
-> themes with a switcher, a small tagged-`sample` seed world including a
-> nested city map) with a working info panel, lore rendering + wiki
-> links, search, a browse view, a timeline, a measure tool, and
-> chronicle/about pages. Most of the helper scripts this file describes
-> **do not exist yet** (M5). Check `docs/PROGRESS.md` before assuming a
-> script/feature below is built — it lists exactly what's done. Sections
-> below describe the target workflow once later milestones land; where
-> something isn't built yet, PROGRESS.md is the source of truth, not
-> this file's aspirational description.
+> Milestones 1–5 (Foundation, Map core, Info layer, Depth, Tooling) of
+> the plan in the original build brief. A real map viewer exists
+> (MapLibre, two themes with a switcher, a small tagged-`sample` seed
+> world including a nested city map, 2 people, 2 factions, 3 events)
+> with a working info panel, lore rendering + wiki links, search, a
+> browse view, a timeline, a measure tool, and chronicle/about pages.
+> Every helper script this file describes now exists (`find`, `show`,
+> `where`, `offset`, `measure`, `shape`, `add`, `move`, `delete`,
+> `rename-id`, `new-map`, `new-layer`, `new-type`, `snapshot`,
+> `export`, `clear-sample`, `icons`) and every one supports `--help`.
+> `.claude/commands/` has the slash commands this file's workflow maps
+> to. Only Milestone 6 (hardening: accessibility, mobile, performance,
+> final docs) remains — check `docs/PROGRESS.md` for exactly what's
+> left there.
 
 ## The standard edit workflow
 
 1. Read `docs/DATA_MODEL.md` for field definitions, and `lore/
 _world-bible.md` if the request touches lore, naming, tone, or world
    rules.
-2. Use `find`/`show` (M5) to see what already exists before adding
+2. Use `find`/`show` to see what already exists before adding
    anything — avoid duplicates, and check for conflicts (see "Consistency
    duty" below).
 3. Make minimal, targeted edits. Don't refactor or "clean up" unrelated
    data while you're in a file.
-4. Use the helper scripts for geometry (`offset`, `measure`, `shape`,
-   M5) rather than hand-computing or guessing coordinates.
+4. Use the helper scripts for geometry (`offset`, `measure`, `shape`)
+   rather than hand-computing or guessing coordinates.
 5. Run `npm run format:data` then `npm run validate`. Both must pass.
-6. If you changed geometry, run `npm run snapshot` (M5) and actually look
+6. If you changed geometry, run `npm run snapshot` and actually look
    at the image — verify placement, labels, and that nothing overlaps
    badly before calling the change done.
 7. Commit with a clear, single-purpose message, prefixed `add:`, `edit:`,
@@ -51,7 +54,7 @@ _world-bible.md` if the request touches lore, naming, tone, or world
 
 - **Vague placement** ("a port city at the mouth of the Silverrun", "north
   of Stormhaven near the coast"): compute it with the geometry helpers
-  (`where`, `offset`, M5), look at the snapshot, and tell Payton the
+  (`where`, `offset`), look at the snapshot, and tell Payton the
   resulting coordinates and what you assumed.
 - **Unnamed things**: propose a name that fits the world bible's naming
   conventions (`lore/_world-bible.md`). If the world bible doesn't cover
@@ -99,7 +102,7 @@ never force-pushes or rewrites history. Still:
 Every entity has an immutable, kebab-case `id` (`stormhaven`,
 `silverrun-river`), unique across the whole repo (`src/core/ids.ts`
 defines the format). **Renaming changes `name`, never `id`.** If an ID
-genuinely must change, that's the `rename-id` script (M5) — it updates
+genuinely must change, that's the `rename-id` script — it updates
 every reference atomically. Never hand-edit an ID that's already
 referenced elsewhere.
 
@@ -140,11 +143,31 @@ npm run lint / format  # code (not data) linting/formatting
 npm run icons           # rebuild assets/icons/sprite.svg from assets/icons/*.svg
 ```
 
-Helper scripts (`find`, `show`, `where`, `offset`, `measure`, `shape`,
-`add`, `rename-id`, `move`, `delete`, `snapshot`, `export`, `new-map`,
-`new-layer`, `new-type`, `clear-sample`) are **not built yet** — see
-`docs/PROGRESS.md`. Once they exist, every one of them supports
-`--help` (as `icons`, already built, does).
+```
+npm run find -- <text>                    search by name/alias/tag/summary
+npm run show -- <id>                       print an entity's full record
+npm run where -- <lng,lat> [--map]          what contains this point; nearest entities
+npm run offset -- <id|lng,lat> <dist> <dir> compute a point at a distance/bearing
+npm run measure -- <a> <b> [--map]          planar distance (+ travel time)
+npm run shape -- <circle|rectangle|blob|route> ...   generate geometry
+npm run add -- <type> <id> --map <m> --layer <l> ...  add a spatial entity
+npm run move -- <id> <lng,lat> | --offset <dist> <dir>
+npm run delete -- <id> [<id> ...] [--yes]   delete entities, reports dangling refs
+npm run rename-id -- <old-id> <new-id>      change an id everywhere, atomically
+npm run new-map -- <id> [--parent-entity ...]
+npm run new-layer -- <mapId> <layerId>
+npm run new-type -- subtype|non-spatial|relation ...
+npm run snapshot -- [--id <id> | --center ... | --bbox ...]  screenshot a map view
+npm run export                               backup data/lore/assets to backups/
+npm run clear-sample [-- --yes]              remove all sample-tagged content
+```
+
+Every one of these supports `--help`. `.claude/commands/` wraps the
+common requests (`/add-place`, `/add-region`, `/add-route`,
+`/add-lore`, `/add-event`, `/edit`, `/delete`, `/new-map`,
+`/check-world`, `/chronicle`, `/suggest`) around these scripts plus
+this file's workflow — use those for anything they cover rather than
+reinventing the steps by hand.
 
 ## File map
 
@@ -181,13 +204,14 @@ private/                     gitignored — never published
 
 ## Extending the model
 
-- **New entity/relation type**: edit `data/registry/entity-types.json` /
-  `relation-types.json` directly (or via `new-type`, once it exists) —
-  never a code change. See `docs/DATA_MODEL.md`.
-- **New layer**: add a folder under a map's `layers/` and declare it in
-  that map's `map.json`.
+- **New entity/relation type**: `npm run new-type -- subtype|non-spatial|relation ...`
+  (or edit `data/registry/entity-types.json` / `relation-types.json`
+  directly) — never a code change. See `docs/DATA_MODEL.md`.
+- **New layer**: `npm run new-layer -- <mapId> <layerId>` (or add the
+  folder and declare it in that map's `map.json` by hand).
 - **New theme**: add `data/themes/<id>.json` — no code change.
-- **New nested map**: `new-map` script (M5) scaffolds `data/maps/<id>/`.
+- **New nested map**: `npm run new-map -- <id> --parent-entity <id>`
+  scaffolds `data/maps/<id>/` and cross-links the parent entity.
 - **Calendar change**: see `docs/DATA_MODEL.md`'s `world.json` section for
   what changing month counts/lengths does and doesn't invalidate.
 
