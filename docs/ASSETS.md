@@ -78,6 +78,21 @@ Regenerating/updating: just `npm update @fontsource/cinzel
 separate build step, Vite bundles the CSS + `.woff2`/`.woff` files
 directly from the installed package.
 
+## App icon
+
+`assets/app-icon/` — the favicon / bookmark / home-screen icon (a folded
+map with a "1" on it, on a light greyish-purple tile). Original art, so
+it falls under `CONTENT-LICENSE.md`. `icon.svg` is the only hand-edited
+file and is also served directly as the modern-browser favicon; the PNGs
+beside it (32px favicon fallback, 180px `apple-touch-icon`, 192/512px
+manifest icons, and a 512px maskable variant with extra padding for
+Android's cropping) are rendered from it by `npm run app-icon` and
+committed. Re-run that after editing the SVG.
+
+The web app manifest (`manifest.webmanifest`) isn't a file in the repo:
+a Vite plugin in `vite.config.ts` generates it at dev/build time so its
+name comes from `data/world.json`.
+
 ## Images
 
 None yet. When added: WebP preferred, alt text required in the entity's

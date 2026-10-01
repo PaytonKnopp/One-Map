@@ -1,5 +1,5 @@
 import { execSync } from 'node:child_process';
-import { copyFileSync, existsSync, mkdirSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 import react from '@vitejs/plugin-react';
@@ -118,6 +118,75 @@ function chroniclePlugin(): Plugin {
   };
 }
 
+/**
+ * Web app manifest (what Android/desktop Chrome use when the site is saved
+ * to a home screen or installed). Generated rather than committed so its
+ * `name` comes from data/world.json, the only place the world's name may
+ * live (CLAUDE.md). Icon paths are relative to the manifest, so they work
+ * under any `base`. The icons themselves: assets/app-icon/, rendered by
+ * `npm run app-icon`.
+ */
+const MANIFEST_FILE = 'manifest.webmanifest';
+const APP_ICON_COLOR = '#c9c1dc';
+
+function webManifestPlugin(): Plugin {
+  let base = '/';
+  const render = (): string => {
+    const world = JSON.parse(
+      readFileSync(fileURLToPath(new URL('./data/world.json', import.meta.url)), 'utf8'),
+    ) as { name: string };
+    return JSON.stringify(
+      {
+        name: world.name,
+        short_name: world.name,
+        start_url: '.',
+        scope: '.',
+        display: 'standalone',
+        background_color: APP_ICON_COLOR,
+        theme_color: APP_ICON_COLOR,
+        icons: [
+          { src: 'app-icon/icon.svg', sizes: 'any', type: 'image/svg+xml' },
+          { src: 'app-icon/icon-192.png', sizes: '192x192', type: 'image/png' },
+          { src: 'app-icon/icon-512.png', sizes: '512x512', type: 'image/png' },
+          {
+            src: 'app-icon/icon-maskable-512.png',
+            sizes: '512x512',
+            type: 'image/png',
+            purpose: 'maskable',
+          },
+        ],
+      },
+      null,
+      2,
+    );
+  };
+
+  return {
+    name: 'web-manifest',
+    configResolved(config) {
+      base = config.base;
+    },
+    configureServer(server) {
+      server.middlewares.use(`${base}${MANIFEST_FILE}`, (_req, res) => {
+        res.setHeader('Content-Type', 'application/manifest+json');
+        res.end(render());
+      });
+    },
+    generateBundle() {
+      this.emitFile({ type: 'asset', fileName: MANIFEST_FILE, source: render() });
+    },
+    transformIndexHtml() {
+      return [
+        {
+          tag: 'link',
+          attrs: { rel: 'manifest', href: `${base}${MANIFEST_FILE}` },
+          injectTo: 'head',
+        },
+      ];
+    },
+  };
+}
+
 export default defineConfig({
   base: detectBase(),
   // `assets/` (icons/fonts/images, brief §5) is this project's static
@@ -126,7 +195,7 @@ export default defineConfig({
   // /icons/city.svg), fetchable at runtime without going through the JS
   // module graph — needed to rasterize icon SVGs onto the map canvas.
   publicDir: 'assets',
-  plugins: [react(), copyMaplibreWorkerPlugin(), chroniclePlugin()],
+  plugins: [react(), copyMaplibreWorkerPlugin(), chroniclePlugin(), webManifestPlugin()],
   build: {
     outDir: 'dist',
   },

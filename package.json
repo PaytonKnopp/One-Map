@@ -20,6 +20,7 @@
     "test:watch": "vitest",
     "validate": "node scripts/validate.ts",
     "icons": "node scripts/icons.ts",
+    "app-icon": "node scripts/app-icon.ts",
     "find": "node scripts/find.ts",
     "show": "node scripts/show.ts",
     "where": "node scripts/where.ts",
