@@ -14,6 +14,7 @@ interface InfoPanelProps {
   entityId: string;
   onClose: () => void;
   onSelectEntity: (id: string) => void;
+  onOpenMap: (mapId: string) => void;
 }
 
 function EntityLink({ id, onSelectEntity }: { id: string; onSelectEntity: (id: string) => void }) {
@@ -38,7 +39,7 @@ function EntityLink({ id, onSelectEntity }: { id: string; onSelectEntity: (id: s
 }
 
 /** The click/tap info panel (brief §8) — name, dates, tags, relations (both directions), computed facts, and the full lore body. */
-export function InfoPanel({ entityId, onClose, onSelectEntity }: InfoPanelProps) {
+export function InfoPanel({ entityId, onClose, onSelectEntity, onOpenMap }: InfoPanelProps) {
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const entity = getEntity(entityId);
 
@@ -153,8 +154,22 @@ export function InfoPanel({ entityId, onClose, onSelectEntity }: InfoPanelProps)
       )}
 
       {entity.mapLink && (
-        <p style={{ fontSize: 13, opacity: 0.7 }}>
-          Opens a nested map ({entity.mapLink}) — lands in M4.
+        <p style={{ fontSize: 13 }}>
+          <button
+            type="button"
+            onClick={() => onOpenMap(entity.mapLink!)}
+            style={{
+              background: 'none',
+              border: '1px solid rgba(128,128,128,0.4)',
+              borderRadius: 4,
+              padding: '4px 10px',
+              cursor: 'pointer',
+              color: 'inherit',
+              font: 'inherit',
+            }}
+          >
+            Open map →
+          </button>
         </p>
       )}
 

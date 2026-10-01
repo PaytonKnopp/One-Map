@@ -59,6 +59,65 @@ function copyMaplibreWorkerPlugin(): Plugin {
   };
 }
 
+/**
+ * The "World chronicle" page (brief §8) reads recent git history. There's
+ * no server to precompute this on for a static site, so it's a Vite
+ * virtual module instead: `git log` runs once at dev-server-start/build
+ * time and its output becomes an importable JS array — no extra file,
+ * no runtime git access (which wouldn't exist once deployed anyway).
+ * CI needs full history for this to be meaningful (fetch-depth: 0 — see
+ * .github/workflows/ci.yml); a shallow local clone just gets fewer commits.
+ */
+const CHRONICLE_MODULE_ID = 'virtual:chronicle';
+const RESOLVED_CHRONICLE_MODULE_ID = `\0${CHRONICLE_MODULE_ID}`;
+const CHRONICLE_COMMIT_LIMIT = 300;
+const CHRONICLE_FIELD_SEPARATOR = '\x1f';
+
+export interface ChronicleCommit {
+  hash: string;
+  date: string;
+  message: string;
+  author: string;
+}
+
+function chroniclePlugin(): Plugin {
+  return {
+    name: 'chronicle',
+    resolveId(id) {
+      if (id === CHRONICLE_MODULE_ID) return RESOLVED_CHRONICLE_MODULE_ID;
+      return undefined;
+    },
+    load(id) {
+      if (id !== RESOLVED_CHRONICLE_MODULE_ID) return undefined;
+
+      let commits: ChronicleCommit[] = [];
+      try {
+        const format = ['%H', '%ad', '%s', '%an'].join(CHRONICLE_FIELD_SEPARATOR);
+        const output = execSync(
+          `git log -n ${CHRONICLE_COMMIT_LIMIT} --date=format:%Y-%m-%d --pretty=format:${format}`,
+          { cwd: fileURLToPath(new URL('.', import.meta.url)), encoding: 'utf8' },
+        );
+        commits = output
+          .split('\n')
+          .filter(Boolean)
+          .map((line) => {
+            const [hash, date, message, author] = line.split(CHRONICLE_FIELD_SEPARATOR);
+            return {
+              hash: hash ?? '',
+              date: date ?? '',
+              message: message ?? '',
+              author: author ?? '',
+            };
+          });
+      } catch {
+        // No git history available (e.g. a source archive, not a clone) — ship an empty chronicle rather than failing the build.
+      }
+
+      return `export default ${JSON.stringify(commits)};`;
+    },
+  };
+}
+
 export default defineConfig({
   base: detectBase(),
   // `assets/` (icons/fonts/images, brief §5) is this project's static
@@ -67,7 +126,7 @@ export default defineConfig({
   // /icons/city.svg), fetchable at runtime without going through the JS
   // module graph — needed to rasterize icon SVGs onto the map canvas.
   publicDir: 'assets',
-  plugins: [react(), copyMaplibreWorkerPlugin()],
+  plugins: [react(), copyMaplibreWorkerPlugin(), chroniclePlugin()],
   build: {
     outDir: 'dist',
   },

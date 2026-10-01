@@ -46,10 +46,7 @@ export function SearchBox({ onSelectEntity }: SearchBoxProps) {
 }
 
 const containerStyle: CSSProperties = {
-  position: 'absolute',
-  top: 12,
-  left: 12,
-  zIndex: 1,
+  position: 'relative',
 };
 
 const inputStyle: CSSProperties = {
@@ -61,6 +58,10 @@ const inputStyle: CSSProperties = {
 };
 
 const listStyle: CSSProperties = {
+  position: 'absolute',
+  top: '100%',
+  left: 0,
+  right: 0,
   listStyle: 'none',
   margin: '4px 0 0',
   padding: 4,
