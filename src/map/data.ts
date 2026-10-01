@@ -40,22 +40,37 @@ export interface LoadedMapData {
   featuresByLayer: Map<string, SpatialFeature[]>;
 }
 
-/** Loads and validates one map's config, theme, and every feature in its declared layers. */
-export function loadMapData(mapId: string): LoadedMapData {
+/** Every theme id with a data/themes/*.json, derived from what's actually on disk. */
+export function themeIds(): string[] {
+  return Object.keys(rawThemes)
+    .map((path) => path.slice('/data/themes/'.length, -'.json'.length))
+    .sort();
+}
+
+/** Loads and validates one theme by id. */
+export function loadTheme(themeId: string): Theme {
+  const themePath = `/data/themes/${themeId}.json`;
+  const rawTheme = rawThemes[themePath];
+  if (!rawTheme) {
+    throw new Error(`Theme "${themeId}" not found (expected at ${themePath})`);
+  }
+  return ThemeSchema.parse(rawTheme);
+}
+
+/**
+ * Loads and validates one map's config, theme, and every feature in its
+ * declared layers. `themeIdOverride` wins over the map's own `theme` (and
+ * the world default) — the theme switcher (brief §9) picks a theme for the
+ * current viewing session without editing data.
+ */
+export function loadMapData(mapId: string, themeIdOverride?: string): LoadedMapData {
   const mapPath = `/data/maps/${mapId}/map.json`;
   const rawMap = rawMapConfigs[mapPath];
   if (!rawMap) {
     throw new Error(`No map.json found for map id "${mapId}" (expected at ${mapPath})`);
   }
   const map = MapConfigSchema.parse(rawMap);
-
-  const themeId = map.theme ?? world.defaultTheme;
-  const themePath = `/data/themes/${themeId}.json`;
-  const rawTheme = rawThemes[themePath];
-  if (!rawTheme) {
-    throw new Error(`Theme "${themeId}" not found (expected at ${themePath})`);
-  }
-  const theme = ThemeSchema.parse(rawTheme);
+  const theme = loadTheme(themeIdOverride ?? map.theme ?? world.defaultTheme);
 
   const featuresByLayer = new Map<string, SpatialFeature[]>();
   for (const layer of map.layers) featuresByLayer.set(layer.id, []);

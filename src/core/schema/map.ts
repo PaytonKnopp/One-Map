@@ -20,6 +20,25 @@ export const MapViewSchema = z.object({
   zoom: z.number().min(0),
 });
 
+/**
+ * A raster image/tile underlay (brief §9 — "support optional raster 'art
+ * layers' ... for future painted art. Build only the hook, not any art.").
+ * `bounds` are the image's four corners, matching MapLibre's `image`
+ * source: top-left, top-right, bottom-right, bottom-left. No art exists
+ * yet anywhere in this repo — this schema plus the rendering in
+ * src/map/MapView.tsx is the hook brief §9 asks for, exercised by nothing
+ * until a real image is added.
+ */
+export const ArtLayerSchema = z.object({
+  id,
+  name: z.string().min(1),
+  /** Path under assets/, e.g. "images/my-map.webp" (served at `${BASE_URL}images/my-map.webp`). */
+  src: z.string().min(1),
+  bounds: z.tuple([CoordinateSchema, CoordinateSchema, CoordinateSchema, CoordinateSchema]),
+  opacity: z.number().min(0).max(1).default(1),
+  defaultVisible: z.boolean().default(true),
+});
+
 export const MapConfigSchema = z.object({
   schemaVersion: z.number().int().positive(),
   id,
@@ -37,8 +56,10 @@ export const MapConfigSchema = z.object({
   minZoom: z.number().min(0).optional(),
   maxZoom: z.number().min(0).optional(),
   layers: z.array(LayerDeclSchema),
+  artLayers: z.array(ArtLayerSchema).optional(),
 });
 
 export type LayerDecl = z.infer<typeof LayerDeclSchema>;
 export type MapView = z.infer<typeof MapViewSchema>;
+export type ArtLayer = z.infer<typeof ArtLayerSchema>;
 export type MapConfig = z.infer<typeof MapConfigSchema>;
