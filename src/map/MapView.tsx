@@ -2,13 +2,13 @@ import type { FeatureCollection, Geometry } from 'geojson';
 import {
   Map as MapLibreGLMap,
   NavigationControl,
-  Popup,
   setWorkerUrl,
   type MapLayerMouseEvent,
 } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { useEffect, useRef, useState } from 'react';
 
+import { ringCentroid } from '../core/geometry.ts';
 import type { SpatialFeature } from '../core/schema/entity.ts';
 import type { MapConfig } from '../core/schema/map.ts';
 import type { Theme } from '../core/schema/theme.ts';
@@ -29,6 +29,9 @@ interface MapViewProps {
   map: MapConfig;
   theme: Theme;
   featuresByLayer: Map<string, SpatialFeature[]>;
+  /** The entity whose info panel is open (brief §8) — the map flies to it if it has geometry. */
+  selectedEntityId?: string | undefined;
+  onSelectEntity?: ((id: string) => void) | undefined;
 }
 
 const SOURCE_PREFIX = 'layer:';
@@ -124,11 +127,23 @@ function addPlaceLayer(map: MapLibreGLMap, sourceId: string): void {
  * text labels, scale bar, and coordinate readout are separate DOM/SVG
  * overlays kept in sync with it (see docs/DECISIONS.md).
  */
-export function MapView({ map: mapConfig, theme, featuresByLayer }: MapViewProps) {
+export function MapView({
+  map: mapConfig,
+  theme,
+  featuresByLayer,
+  selectedEntityId,
+  onSelectEntity,
+}: MapViewProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<MapLibreGLMap | null>(null);
   const [mapInstance, setMapInstance] = useState<MapLibreGLMap | null>(null);
-  const popupRef = useRef<Popup | null>(null);
+  // A ref, not a dependency, so picking a new onSelectEntity identity each
+  // render doesn't force the whole map (sources, layers, icon loading) to
+  // be rebuilt — only the click handler itself needs the latest callback.
+  const onSelectEntityRef = useRef(onSelectEntity);
+  useEffect(() => {
+    onSelectEntityRef.current = onSelectEntity;
+  }, [onSelectEntity]);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -203,15 +218,8 @@ export function MapView({ map: mapConfig, theme, featuresByLayer }: MapViewProps
 
           map.on('click', `${sourceId}:icon`, (e: MapLayerMouseEvent) => {
             const feature = e.features?.[0];
-            if (!feature) return;
-            const props = feature.properties as { name?: string; summary?: string };
-            popupRef.current?.remove();
-            popupRef.current = new Popup({ closeButton: true, offset: 12 })
-              .setLngLat(e.lngLat)
-              .setHTML(
-                `<strong>${props.name ?? '(unnamed)'}</strong>${props.summary ? `<p>${props.summary}</p>` : ''}`,
-              )
-              .addTo(map);
+            const id = feature?.properties?.id as string | undefined;
+            if (id) onSelectEntityRef.current?.(id);
           });
           map.on(
             'mouseenter',
@@ -227,7 +235,6 @@ export function MapView({ map: mapConfig, theme, featuresByLayer }: MapViewProps
 
     return () => {
       cancelled = true;
-      popupRef.current?.remove();
       map.remove();
       mapRef.current = null;
       setMapInstance(null);
@@ -237,6 +244,31 @@ export function MapView({ map: mapConfig, theme, featuresByLayer }: MapViewProps
   }, [mapConfig, theme, featuresByLayer]);
 
   const allFeatures = Array.from(featuresByLayer.values()).flat();
+
+  // Flies to the selected entity (brief §8's info panel) when it has
+  // geometry on this map — not on first mount (no entity picked yet), and
+  // not if the id refers to an entity on a different map (nested maps, M4).
+  useEffect(() => {
+    if (!mapInstance || !selectedEntityId) return;
+    const feature = allFeatures.find((f) => f.properties.id === selectedEntityId);
+    if (!feature) return;
+
+    const geometry = feature.geometry;
+    const target =
+      geometry.type === 'Point'
+        ? { lng: geometry.coordinates[0], lat: geometry.coordinates[1] }
+        : geometry.type === 'LineString'
+          ? { lng: geometry.coordinates[0]![0], lat: geometry.coordinates[0]![1] }
+          : ringCentroid(
+              geometry.type === 'Polygon' ? geometry.coordinates[0]! : geometry.coordinates[0]![0]!,
+            );
+
+    mapInstance.easeTo({
+      center: [target.lng, target.lat],
+      zoom: Math.max(mapInstance.getZoom(), 6),
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `allFeatures` is a fresh array identity every render; only mapInstance/selectedEntityId should retrigger the fly-to
+  }, [mapInstance, selectedEntityId]);
 
   return (
     <div style={{ position: 'relative', width: '100%', height: '100%' }}>
