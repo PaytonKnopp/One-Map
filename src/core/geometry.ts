@@ -167,3 +167,37 @@ export function ringCentroid(ring: readonly [number, number][]): LngLat {
   const signedArea = signedAreaSum / 2;
   return fromMercator({ x: cx / (6 * signedArea), y: cy / (6 * signedArea) });
 }
+
+/**
+ * Whether `point` falls inside a closed ring, via even-odd ray casting.
+ * Topological (not metric), so plain [lng, lat] works the same as any
+ * other 2D plane — no mercator projection needed here.
+ */
+export function pointInRing(point: LngLat, ring: readonly [number, number][]): boolean {
+  let inside = false;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const [xi, yi] = ring[i]!;
+    const [xj, yj] = ring[j]!;
+    const crosses = yi > point.lat !== yj > point.lat;
+    if (crosses) {
+      const xIntersect = ((xj - xi) * (point.lat - yi)) / (yj - yi) + xi;
+      if (point.lng < xIntersect) inside = !inside;
+    }
+  }
+  return inside;
+}
+
+/**
+ * Whether `point` falls inside a Polygon/MultiPolygon's rings: inside the
+ * outer ring of at least one of `rings` (each `[outer, ...holes]`) and
+ * outside all of that polygon's holes.
+ */
+export function pointInPolygonRings(
+  point: LngLat,
+  polygons: readonly (readonly (readonly [number, number][])[])[],
+): boolean {
+  return polygons.some(([outer, ...holes]) => {
+    if (!outer || !pointInRing(point, outer)) return false;
+    return !holes.some((hole) => pointInRing(point, hole));
+  });
+}

@@ -18,8 +18,10 @@ export const DateKeySchema = z.object({
   m: z.number().int().min(1).optional(),
   d: z.number().int().min(1).optional(),
 });
+export type DateKey = z.infer<typeof DateKeySchema>;
 
 export const EntityStatusSchema = z.enum(['canon', 'draft', 'retired']);
+export type EntityStatus = z.infer<typeof EntityStatusSchema>;
 
 export const RelationSchema = z.object({
   type: id,
@@ -28,12 +30,14 @@ export const RelationSchema = z.object({
   to: DateKeySchema.optional(),
   note: z.string().min(1).optional(),
 });
+export type Relation = z.infer<typeof RelationSchema>;
 
 export const ImageRefSchema = z.object({
   src: z.string().min(1),
   alt: z.string().min(1),
   caption: z.string().min(1).optional(),
 });
+export type ImageRef = z.infer<typeof ImageRefSchema>;
 
 /** Spatial entity kinds (brief §6) — fixed by the data model, unlike subtypes. */
 export const SPATIAL_ENTITY_TYPES = ['place', 'region', 'route', 'label'] as const;

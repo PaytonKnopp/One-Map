@@ -7,6 +7,8 @@ import {
   metersToWorldUnits,
   planarBearingDegrees,
   planarDistanceMeters,
+  pointInPolygonRings,
+  pointInRing,
   polygonAreaSquareMeters,
   ringAreaSquareMeters,
   ringCentroid,
@@ -190,5 +192,34 @@ describe('ringCentroid', () => {
 describe('world-unit conversions', () => {
   it('round-trips meters <-> world units', () => {
     expect(metersToWorldUnits(worldUnitsToMeters(42, 1000), 1000)).toBeCloseTo(42, 9);
+  });
+});
+
+describe('pointInRing / pointInPolygonRings', () => {
+  const square: [number, number][] = [
+    [0, 0],
+    [0, 2],
+    [2, 2],
+    [2, 0],
+    [0, 0],
+  ];
+
+  it('is true for a point inside, false for one outside', () => {
+    expect(pointInRing({ lng: 1, lat: 1 }, square)).toBe(true);
+    expect(pointInRing({ lng: 5, lat: 5 }, square)).toBe(false);
+  });
+
+  it('pointInPolygonRings excludes points inside a hole', () => {
+    const hole: [number, number][] = [
+      [0.5, 0.5],
+      [0.5, 1.5],
+      [1.5, 1.5],
+      [1.5, 0.5],
+      [0.5, 0.5],
+    ];
+    const polygon = [square, hole];
+    expect(pointInPolygonRings({ lng: 1, lat: 1 }, [polygon])).toBe(false); // inside the hole
+    expect(pointInPolygonRings({ lng: 0.2, lat: 0.2 }, [polygon])).toBe(true); // inside the outer, outside the hole
+    expect(pointInPolygonRings({ lng: 9, lat: 9 }, [polygon])).toBe(false); // outside entirely
   });
 });
